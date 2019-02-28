@@ -1,5 +1,8 @@
-all:
-	iverilog -o hello hello.v
+bin:
+	iverilog -Wall -o test test.v
 
-run:
-	vvp hello
+graph:
+	yosys -q -s yosys.txt
+
+wave:
+	gtkwave test.vcd
