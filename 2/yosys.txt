@@ -1,2 +1,2 @@
-read_verilog test.v
-show half_adder
+read_verilog half_adder.v
+show

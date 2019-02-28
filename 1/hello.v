@@ -1,7 +1,6 @@
 module hello;
-    initial
-        begin
-            $display("Hello, World");
-            $finish ;
-        end
+    initial begin
+        $display("Hello, World");
+        $finish;
+    end
 endmodule

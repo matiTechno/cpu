@@ -1,41 +1,38 @@
-module half_adder(a, b, sum, carry);
-
-    input a;
-    input b;
-    output sum;
-    output carry;
-
-    and(a, b, carry);
-    xor(a, b, sum);
-
-endmodule
-
 module test;
 
-    reg r1;
-    reg r2;
+    reg a;
+    reg b;
     wire sum;
     wire carry;
-
-    half_adder half_adder( .a(r1), .b(r2), .sum(sum), .carry(carry) );
 
     initial begin
 
         $dumpfile("test.vcd");
         $dumpvars(0, test);
+        $monitor("a=%b, b=%b, sum=%b, carry=%b", a, b, sum, carry);
 
-        r1 = 1'b0;
-        r2 = 1'b0;
+        a = 0;
+        b = 1;
+
         #10;
-        r1 = 1'b0;
-        r2 = 1'b1;
+
+        a = 1;
+        b = 1;
+
         #10;
-        r1 = 1'b1;
-        r2 = 1'b0;
+
+        a = 1;
+        b = 0;
+
         #10;
-        r1 = 1'b1;
-        r2 = 1'b1;
+
+        a = 0;
+        b = 0;
+
         #10;
+        $finish;
     end
+
+    half_adder half_adder(a, b, sum, carry);
 
 endmodule
