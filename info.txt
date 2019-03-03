@@ -62,4 +62,87 @@ quite long term. And if I succeed with them they will be a game changers in my p
 
     How to make sure that all memory is initialized correctly during first cycle. And what if clock will immiedietly produce
     rising signal and second instruction will be selected and overwrite results from the first one?
+    Maybe some bios makes sure that all the circuit is in stable state before firing clock
+
+
     Moving this to readme.txt project because it grows out of control.
+
+...
+
+Right now I plan to write simple program and load it to ROM to validate if my cpu is working.
+Then I will write assembler to code some bigger programs.
+
+
+
+ISA - this cpu is taken from nandgame.com
+      and nandgame.com copied 'from nand to tetris', it is well described in this book
+      so it is 'hack' machine (that's how authors named it)
+
+* instructions are 16 bit
+
+* there are two registers A and D
+
+* convention - ALU has two 16 bit inputs, ALU.X and ALU.Y
+
+* ram can be accesed by storing target address in A register and setting bit 15 of instruction to 0; ram output will be
+  available at ALU.Y next cycle
+
+* we will use this convention - A* means RAM at address stored in A
+
+* ALU.X is always set to D; ALU.Y can be A or A*
+
+* if ALU input is zeroed and inverted it is first zeroed and the inverted
+
+* jmp instruction sets the program to the location pointed by A; so before jumping set A
+
+bit:
+
+15 - if 0 load value to the register A (bits 14:0 are the value, no other action is done during this cycle)
+14 - ignored
+13 - ignored
+12 - set ALU.Y to, A if 0, A* if 1
+11 - zero ALU.X
+10 - invert ALU.X
+9  - zero ALU.Y
+8  - invert ALU.Y
+7  - ALU operation - if 0 logical and, if 1 addition
+6  - invert  ALU output
+5  - write   ALU output to A
+4  - write   ALU output to D
+3  - write   ALU output to A*
+2  - jump if ALU output is greater than 0
+1  - jump if ALU output is 0
+0  - jump if ALU output is less than 0
+
+
+Only parts that require clocking are:
+    * register in cpu_program->cpu_counter (outputs current instruction)
+    * cpu_control_unit->cpu_memoru_unit: reg A, reg D, RAM
+
+
+ok lets write some sample program
+add 4 and 5 and store results in ram address 0
+
+0004         ; store 4 in A
+4, 7, 11, 15 ; write A to D
+0005         ; store 5 in A
+4, 7, 15     ; write A + D to D
+0000         ; store 0 in A
+3, 7, 9, 15  ; store D in A* (0)
+0007         ; point A to instruction 7, jump instruction (next instruction after this one)
+0, 1, 2, 15  ; enter never ending loop
+             ; now word_0 in ram should contain value 9
+
+now let's convert this representation to hex
+and save as prog1.bin and load in program rom in logisim
+
+0004
+8890
+0005
+8090
+0000
+8288
+0007
+8007
+
+hope it works; Yea it fucking works. Hell fucking yea. I got my first cpu running!
