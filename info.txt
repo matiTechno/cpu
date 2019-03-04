@@ -146,3 +146,13 @@ and save as prog1.bin and load in program rom in logisim
 8007
 
 hope it works; Yea it fucking works. Hell fucking yea. I got my first cpu running!
+
+It seems that logisim evolution is full of bugs. If you have internal simulation error try to save project to different file
+and open this new file. It solved a problem for me.
+
+Next step: assembler and some bigger program to test the cpu
+
+How to make sure that 'gated D latch' is initialized to 0?
+With RAM I don't care. But instruction-counter must be 0, so program starts at instruction 0.
+Maybe there must be some initial one time initialization before program runs, rest button or something.
+For now I will stick to logisim built-in registers.

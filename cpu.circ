@@ -152,35 +152,6 @@ end TCL_Generic;
     </tool>
     <tool lib="1" name="OR Gate"/>
   </toolbar>
-  <circuit name="main">
-    <a name="circuit" val="main"/>
-    <a name="clabel" val=""/>
-    <a name="clabelup" val="east"/>
-    <a name="clabelfont" val="SansSerif bold 16"/>
-    <a name="circuitnamedbox" val="true"/>
-    <a name="circuitvhdlpath" val=""/>
-    <wire from="(440,460)" to="(440,490)"/>
-    <comp loc="(180,240)" name="reg_8"/>
-    <comp loc="(190,340)" name="mux_4_1_8"/>
-    <comp loc="(230,140)" name="ripple_adder_8"/>
-    <comp loc="(230,500)" name="alu_8"/>
-    <comp lib="4" loc="(410,370)" name="Register">
-      <a name="width" val="1"/>
-    </comp>
-    <comp lib="0" loc="(470,400)" name="Pin">
-      <a name="facing" val="west"/>
-      <a name="output" val="true"/>
-      <a name="labelloc" val="east"/>
-    </comp>
-    <comp lib="0" loc="(410,400)" name="Pin"/>
-    <comp lib="0" loc="(410,420)" name="Pin"/>
-    <comp lib="0" loc="(410,440)" name="Pin"/>
-    <comp lib="0" loc="(440,490)" name="Ground"/>
-    <comp lib="8" loc="(534,364)" name="Text">
-      <a name="text" val="data is only changed when clk changes from 0 to 1; my reg is different"/>
-      <a name="font" val="SansSerif plain 12"/>
-    </comp>
-  </circuit>
   <circuit name="my_xor">
     <a name="circuit" val="my_xor"/>
     <a name="clabel" val=""/>
@@ -817,6 +788,47 @@ end TCL_Generic;
       <a name="label" val="sel0"/>
     </comp>
   </circuit>
+  <circuit name="demux_1_2_1">
+    <a name="circuit" val="demux_1_2_1"/>
+    <a name="clabel" val=""/>
+    <a name="clabelup" val="east"/>
+    <a name="clabelfont" val="SansSerif bold 16"/>
+    <a name="circuitnamedbox" val="true"/>
+    <a name="circuitvhdlpath" val=""/>
+    <wire from="(150,300)" to="(150,350)"/>
+    <wire from="(110,390)" to="(200,390)"/>
+    <wire from="(150,350)" to="(300,350)"/>
+    <wire from="(150,260)" to="(300,260)"/>
+    <wire from="(110,300)" to="(150,300)"/>
+    <wire from="(200,300)" to="(200,390)"/>
+    <wire from="(150,260)" to="(150,300)"/>
+    <wire from="(250,300)" to="(300,300)"/>
+    <wire from="(350,280)" to="(470,280)"/>
+    <wire from="(350,370)" to="(470,370)"/>
+    <wire from="(200,390)" to="(300,390)"/>
+    <wire from="(200,300)" to="(220,300)"/>
+    <comp lib="0" loc="(470,280)" name="Pin">
+      <a name="facing" val="west"/>
+      <a name="output" val="true"/>
+      <a name="label" val="o0"/>
+      <a name="labelloc" val="east"/>
+    </comp>
+    <comp lib="0" loc="(110,300)" name="Pin">
+      <a name="label" val="data"/>
+    </comp>
+    <comp lib="1" loc="(350,280)" name="AND Gate"/>
+    <comp lib="1" loc="(350,370)" name="AND Gate"/>
+    <comp lib="0" loc="(110,390)" name="Pin">
+      <a name="label" val="sel"/>
+    </comp>
+    <comp lib="1" loc="(250,300)" name="NOT Gate"/>
+    <comp lib="0" loc="(470,370)" name="Pin">
+      <a name="facing" val="west"/>
+      <a name="output" val="true"/>
+      <a name="label" val="o1"/>
+      <a name="labelloc" val="east"/>
+    </comp>
+  </circuit>
   <circuit name="gated_D_latch">
     <a name="circuit" val="gated_D_latch"/>
     <a name="clabel" val=""/>
@@ -907,239 +919,6 @@ end TCL_Generic;
     <comp lib="1" loc="(230,380)" name="AND Gate"/>
     <comp lib="1" loc="(160,400)" name="NOT Gate"/>
     <comp loc="(580,300)" name="gated_D_latch"/>
-  </circuit>
-  <circuit name="alu_8">
-    <a name="circuit" val="alu_8"/>
-    <a name="clabel" val=""/>
-    <a name="clabelup" val="east"/>
-    <a name="clabelfont" val="SansSerif bold 16"/>
-    <a name="circuitnamedbox" val="true"/>
-    <a name="circuitvhdlpath" val=""/>
-    <wire from="(850,210)" to="(850,350)"/>
-    <wire from="(980,190)" to="(1030,190)"/>
-    <wire from="(270,220)" to="(270,480)"/>
-    <wire from="(880,290)" to="(880,430)"/>
-    <wire from="(760,250)" to="(880,250)"/>
-    <wire from="(700,150)" to="(880,150)"/>
-    <wire from="(140,150)" to="(520,150)"/>
-    <wire from="(140,200)" to="(200,200)"/>
-    <wire from="(550,170)" to="(550,300)"/>
-    <wire from="(230,320)" to="(350,320)"/>
-    <wire from="(560,190)" to="(560,260)"/>
-    <wire from="(80,320)" to="(130,320)"/>
-    <wire from="(860,270)" to="(860,400)"/>
-    <wire from="(480,370)" to="(600,370)"/>
-    <wire from="(700,460)" to="(930,460)"/>
-    <wire from="(480,220)" to="(480,370)"/>
-    <wire from="(200,90)" to="(760,90)"/>
-    <wire from="(200,200)" to="(200,220)"/>
-    <wire from="(80,290)" to="(120,290)"/>
-    <wire from="(330,280)" to="(330,500)"/>
-    <wire from="(120,520)" to="(160,520)"/>
-    <wire from="(230,520)" to="(270,520)"/>
-    <wire from="(540,110)" to="(540,150)"/>
-    <wire from="(860,270)" to="(880,270)"/>
-    <wire from="(80,430)" to="(880,430)"/>
-    <wire from="(80,260)" to="(560,260)"/>
-    <wire from="(540,150)" to="(560,150)"/>
-    <wire from="(880,150)" to="(880,190)"/>
-    <wire from="(120,290)" to="(120,520)"/>
-    <wire from="(700,170)" to="(700,460)"/>
-    <wire from="(330,280)" to="(350,280)"/>
-    <wire from="(270,220)" to="(480,220)"/>
-    <wire from="(520,150)" to="(540,150)"/>
-    <wire from="(760,90)" to="(760,250)"/>
-    <wire from="(400,300)" to="(550,300)"/>
-    <wire from="(200,90)" to="(200,200)"/>
-    <wire from="(850,210)" to="(880,210)"/>
-    <wire from="(650,350)" to="(850,350)"/>
-    <wire from="(520,150)" to="(520,330)"/>
-    <wire from="(810,110)" to="(810,230)"/>
-    <wire from="(80,400)" to="(860,400)"/>
-    <wire from="(810,230)" to="(880,230)"/>
-    <wire from="(520,330)" to="(600,330)"/>
-    <wire from="(200,220)" to="(270,220)"/>
-    <wire from="(540,110)" to="(810,110)"/>
-    <wire from="(880,230)" to="(890,230)"/>
-    <wire from="(550,170)" to="(560,170)"/>
-    <comp lib="0" loc="(140,200)" name="Pin">
-      <a name="width" val="8"/>
-      <a name="label" val="b"/>
-    </comp>
-    <comp loc="(700,150)" name="ripple_adder_8"/>
-    <comp loc="(980,190)" name="mux_4_1_8"/>
-    <comp lib="0" loc="(1030,190)" name="Pin">
-      <a name="facing" val="west"/>
-      <a name="output" val="true"/>
-      <a name="width" val="8"/>
-      <a name="labelloc" val="east"/>
-    </comp>
-    <comp lib="0" loc="(80,400)" name="Pin">
-      <a name="label" val="s0"/>
-    </comp>
-    <comp lib="0" loc="(80,430)" name="Pin">
-      <a name="label" val="s1"/>
-    </comp>
-    <comp lib="0" loc="(80,260)" name="Pin">
-      <a name="label" val="inc_b"/>
-    </comp>
-    <comp lib="0" loc="(80,290)" name="Pin">
-      <a name="label" val="inv_b"/>
-    </comp>
-    <comp lib="0" loc="(80,320)" name="Pin">
-      <a name="label" val="zero_b"/>
-    </comp>
-    <comp lib="0" loc="(140,150)" name="Pin">
-      <a name="width" val="8"/>
-      <a name="label" val="a"/>
-    </comp>
-    <comp lib="0" loc="(930,460)" name="Pin">
-      <a name="facing" val="west"/>
-      <a name="output" val="true"/>
-      <a name="label" val="carry"/>
-      <a name="labelloc" val="east"/>
-    </comp>
-    <comp lib="1" loc="(650,350)" name="AND Gate">
-      <a name="width" val="8"/>
-    </comp>
-    <comp lib="1" loc="(330,500)" name="XOR Gate">
-      <a name="width" val="8"/>
-    </comp>
-    <comp lib="1" loc="(400,300)" name="AND Gate">
-      <a name="width" val="8"/>
-    </comp>
-    <comp lib="1" loc="(160,320)" name="NOT Gate"/>
-    <comp loc="(230,320)" name="rep_8"/>
-    <comp loc="(230,520)" name="rep_8"/>
-  </circuit>
-  <circuit name="rep_8">
-    <a name="circuit" val="rep_8"/>
-    <a name="clabel" val=""/>
-    <a name="clabelup" val="east"/>
-    <a name="clabelfont" val="SansSerif bold 16"/>
-    <a name="circuitnamedbox" val="true"/>
-    <a name="circuitvhdlpath" val=""/>
-    <wire from="(220,210)" to="(250,210)"/>
-    <wire from="(250,220)" to="(310,220)"/>
-    <wire from="(250,240)" to="(310,240)"/>
-    <wire from="(250,260)" to="(310,260)"/>
-    <wire from="(250,280)" to="(310,280)"/>
-    <wire from="(250,210)" to="(310,210)"/>
-    <wire from="(250,230)" to="(310,230)"/>
-    <wire from="(250,250)" to="(310,250)"/>
-    <wire from="(250,270)" to="(310,270)"/>
-    <wire from="(250,210)" to="(250,220)"/>
-    <wire from="(250,230)" to="(250,240)"/>
-    <wire from="(250,250)" to="(250,260)"/>
-    <wire from="(250,270)" to="(250,280)"/>
-    <wire from="(250,220)" to="(250,230)"/>
-    <wire from="(250,240)" to="(250,250)"/>
-    <wire from="(250,260)" to="(250,270)"/>
-    <wire from="(330,200)" to="(370,200)"/>
-    <comp lib="0" loc="(370,200)" name="Pin">
-      <a name="facing" val="west"/>
-      <a name="output" val="true"/>
-      <a name="width" val="8"/>
-      <a name="labelloc" val="east"/>
-    </comp>
-    <comp lib="0" loc="(220,210)" name="Pin"/>
-    <comp lib="0" loc="(330,200)" name="Splitter">
-      <a name="facing" val="west"/>
-      <a name="fanout" val="8"/>
-      <a name="incoming" val="8"/>
-    </comp>
-    <comp lib="8" loc="(386,130)" name="Text">
-      <a name="text" val="bit extender is not working as expecte so I created my version"/>
-      <a name="font" val="SansSerif plain 12"/>
-    </comp>
-  </circuit>
-  <circuit name="rep_13">
-    <a name="circuit" val="rep_13"/>
-    <a name="clabel" val=""/>
-    <a name="clabelup" val="east"/>
-    <a name="clabelfont" val="SansSerif bold 16"/>
-    <a name="circuitnamedbox" val="true"/>
-    <a name="circuitvhdlpath" val=""/>
-    <wire from="(250,260)" to="(310,260)"/>
-    <wire from="(250,220)" to="(310,220)"/>
-    <wire from="(250,240)" to="(310,240)"/>
-    <wire from="(250,280)" to="(310,280)"/>
-    <wire from="(250,210)" to="(310,210)"/>
-    <wire from="(250,230)" to="(310,230)"/>
-    <wire from="(250,250)" to="(310,250)"/>
-    <wire from="(250,270)" to="(310,270)"/>
-    <wire from="(250,290)" to="(310,290)"/>
-    <wire from="(250,300)" to="(310,300)"/>
-    <wire from="(250,310)" to="(310,310)"/>
-    <wire from="(250,320)" to="(310,320)"/>
-    <wire from="(250,330)" to="(310,330)"/>
-    <wire from="(250,250)" to="(250,260)"/>
-    <wire from="(250,210)" to="(250,220)"/>
-    <wire from="(250,230)" to="(250,240)"/>
-    <wire from="(250,270)" to="(250,280)"/>
-    <wire from="(250,220)" to="(250,230)"/>
-    <wire from="(250,240)" to="(250,250)"/>
-    <wire from="(250,260)" to="(250,270)"/>
-    <wire from="(250,280)" to="(250,290)"/>
-    <wire from="(250,290)" to="(250,300)"/>
-    <wire from="(250,300)" to="(250,310)"/>
-    <wire from="(250,310)" to="(250,320)"/>
-    <wire from="(250,320)" to="(250,330)"/>
-    <wire from="(330,200)" to="(370,200)"/>
-    <wire from="(220,210)" to="(250,210)"/>
-    <comp lib="0" loc="(370,200)" name="Pin">
-      <a name="facing" val="west"/>
-      <a name="output" val="true"/>
-      <a name="width" val="13"/>
-      <a name="labelloc" val="east"/>
-    </comp>
-    <comp lib="0" loc="(220,210)" name="Pin"/>
-    <comp lib="0" loc="(330,200)" name="Splitter">
-      <a name="facing" val="west"/>
-      <a name="fanout" val="13"/>
-      <a name="incoming" val="13"/>
-    </comp>
-  </circuit>
-  <circuit name="demux_1_2_1">
-    <a name="circuit" val="demux_1_2_1"/>
-    <a name="clabel" val=""/>
-    <a name="clabelup" val="east"/>
-    <a name="clabelfont" val="SansSerif bold 16"/>
-    <a name="circuitnamedbox" val="true"/>
-    <a name="circuitvhdlpath" val=""/>
-    <wire from="(150,300)" to="(150,350)"/>
-    <wire from="(110,390)" to="(200,390)"/>
-    <wire from="(150,350)" to="(300,350)"/>
-    <wire from="(150,260)" to="(300,260)"/>
-    <wire from="(110,300)" to="(150,300)"/>
-    <wire from="(200,300)" to="(200,390)"/>
-    <wire from="(150,260)" to="(150,300)"/>
-    <wire from="(250,300)" to="(300,300)"/>
-    <wire from="(350,280)" to="(470,280)"/>
-    <wire from="(350,370)" to="(470,370)"/>
-    <wire from="(200,390)" to="(300,390)"/>
-    <wire from="(200,300)" to="(220,300)"/>
-    <comp lib="0" loc="(470,280)" name="Pin">
-      <a name="facing" val="west"/>
-      <a name="output" val="true"/>
-      <a name="label" val="o0"/>
-      <a name="labelloc" val="east"/>
-    </comp>
-    <comp lib="0" loc="(110,300)" name="Pin">
-      <a name="label" val="data"/>
-    </comp>
-    <comp lib="1" loc="(350,280)" name="AND Gate"/>
-    <comp lib="1" loc="(350,370)" name="AND Gate"/>
-    <comp lib="0" loc="(110,390)" name="Pin">
-      <a name="label" val="sel"/>
-    </comp>
-    <comp lib="1" loc="(250,300)" name="NOT Gate"/>
-    <comp lib="0" loc="(470,370)" name="Pin">
-      <a name="facing" val="west"/>
-      <a name="output" val="true"/>
-      <a name="label" val="o1"/>
-      <a name="labelloc" val="east"/>
-    </comp>
   </circuit>
   <circuit name="reg_8">
     <a name="circuit" val="reg_8"/>
@@ -1260,8 +1039,8 @@ end TCL_Generic;
       <a name="incoming" val="8"/>
     </comp>
   </circuit>
-  <circuit name="ram_4_reg8">
-    <a name="circuit" val="ram_4_reg8"/>
+  <circuit name="ram_8_reg8">
+    <a name="circuit" val="ram_8_reg8"/>
     <a name="clabel" val=""/>
     <a name="clabelup" val="east"/>
     <a name="clabelfont" val="SansSerif bold 16"/>
@@ -1395,6 +1174,53 @@ end TCL_Generic;
       <a name="label" val="data"/>
     </comp>
   </circuit>
+  <circuit name="rep_13">
+    <a name="circuit" val="rep_13"/>
+    <a name="clabel" val=""/>
+    <a name="clabelup" val="east"/>
+    <a name="clabelfont" val="SansSerif bold 16"/>
+    <a name="circuitnamedbox" val="true"/>
+    <a name="circuitvhdlpath" val=""/>
+    <wire from="(250,260)" to="(310,260)"/>
+    <wire from="(250,220)" to="(310,220)"/>
+    <wire from="(250,240)" to="(310,240)"/>
+    <wire from="(250,280)" to="(310,280)"/>
+    <wire from="(250,210)" to="(310,210)"/>
+    <wire from="(250,230)" to="(310,230)"/>
+    <wire from="(250,250)" to="(310,250)"/>
+    <wire from="(250,270)" to="(310,270)"/>
+    <wire from="(250,290)" to="(310,290)"/>
+    <wire from="(250,300)" to="(310,300)"/>
+    <wire from="(250,310)" to="(310,310)"/>
+    <wire from="(250,320)" to="(310,320)"/>
+    <wire from="(250,330)" to="(310,330)"/>
+    <wire from="(250,250)" to="(250,260)"/>
+    <wire from="(250,210)" to="(250,220)"/>
+    <wire from="(250,230)" to="(250,240)"/>
+    <wire from="(250,270)" to="(250,280)"/>
+    <wire from="(250,220)" to="(250,230)"/>
+    <wire from="(250,240)" to="(250,250)"/>
+    <wire from="(250,260)" to="(250,270)"/>
+    <wire from="(250,280)" to="(250,290)"/>
+    <wire from="(250,290)" to="(250,300)"/>
+    <wire from="(250,300)" to="(250,310)"/>
+    <wire from="(250,310)" to="(250,320)"/>
+    <wire from="(250,320)" to="(250,330)"/>
+    <wire from="(330,200)" to="(370,200)"/>
+    <wire from="(220,210)" to="(250,210)"/>
+    <comp lib="0" loc="(370,200)" name="Pin">
+      <a name="facing" val="west"/>
+      <a name="output" val="true"/>
+      <a name="width" val="13"/>
+      <a name="labelloc" val="east"/>
+    </comp>
+    <comp lib="0" loc="(220,210)" name="Pin"/>
+    <comp lib="0" loc="(330,200)" name="Splitter">
+      <a name="facing" val="west"/>
+      <a name="fanout" val="13"/>
+      <a name="incoming" val="13"/>
+    </comp>
+  </circuit>
   <circuit name="cpu_incrementer">
     <a name="circuit" val="cpu_incrementer"/>
     <a name="clabel" val=""/>
@@ -1404,10 +1230,10 @@ end TCL_Generic;
     <a name="circuitvhdlpath" val=""/>
     <wire from="(300,350)" to="(300,420)"/>
     <wire from="(490,310)" to="(550,310)"/>
-    <wire from="(270,420)" to="(300,420)"/>
-    <wire from="(160,330)" to="(160,340)"/>
     <wire from="(220,250)" to="(230,250)"/>
+    <wire from="(270,420)" to="(300,420)"/>
     <wire from="(160,330)" to="(300,330)"/>
+    <wire from="(160,330)" to="(160,340)"/>
     <wire from="(230,310)" to="(300,310)"/>
     <wire from="(230,250)" to="(230,310)"/>
     <comp lib="0" loc="(160,340)" name="Ground">
