@@ -98,18 +98,22 @@ ISA - this cpu is taken from nandgame.com
 bit:
 
 15 - if 0 load value to the register A (bits 14:0 are the value, no other action is done during this cycle)
+
 14 - ignored
 13 - ignored
-12 - set ALU.Y to, A if 0, A* if 1
-11 - zero ALU.X
+
+12 - set    ALU.Y to, A if 0, A* if 1
+11 - zero   ALU.X
 10 - invert ALU.X
-9  - zero ALU.Y
+9  - zero   ALU.Y
 8  - invert ALU.Y
-7  - ALU operation - if 0 logical and, if 1 addition
-6  - invert  ALU output
+7  - ALU operation - if 0 bitwise and, if 1 addition
+6  - invert ALU output
+
 5  - write   ALU output to A
 4  - write   ALU output to D
 3  - write   ALU output to A*
+
 2  - jump if ALU output is greater than 0
 1  - jump if ALU output is 0
 0  - jump if ALU output is less than 0
@@ -150,9 +154,25 @@ hope it works; Yea it fucking works. Hell fucking yea. I got my first cpu runnin
 It seems that logisim evolution is full of bugs. If you have internal simulation error try to save project to different file
 and open this new file. It solved a problem for me.
 
-Next step: assembler and some bigger program to test the cpu
+Next step: assembler and some bigger program to test the cpu, I could also try to visualize RAM (as an image), it might be possible in logisim,
+I saw someone doing it
 
 How to make sure that 'gated D latch' is initialized to 0?
 With RAM I don't care. But instruction-counter must be 0, so program starts at instruction 0.
 Maybe there must be some initial one time initialization before program runs, rest button or something.
 For now I will stick to logisim built-in registers.
+
+should be *A and not A* - stick to C syntax which everyone knows
+
+
+check if on logisim keyboard mapping can be done
+
+emulate floats in software?
+
+understand how alu really works, e.g. why
+
+       x - y = ~( ~x + y )
+
+       I know that
+
+       -y = ~y + 1
