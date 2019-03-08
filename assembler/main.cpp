@@ -315,7 +315,7 @@ int lex(std::vector<Token>& tokens, const char* input_buf)
                     ++input_buf;
                     ++len;
 
-                    if(!is_alphenumeric(*input_buf) && c != '_')
+                    if(!is_alphenumeric(*input_buf) && *input_buf != '_')
                         break;
                 }
 
@@ -351,15 +351,15 @@ int lex(std::vector<Token>& tokens, const char* input_buf)
 bool parse_alu_jmp(Inst_desc& desc, Token* const token)
 {
     int count = 0;
-    Token* it = token;
+    Token* tok_it = token;
 
     for(;;)
     {
-        if(it->type == Token_type::END || it->type == Token_type::COMMA)
+        if(tok_it->type == Token_type::END || tok_it->type == Token_type::COMMA)
             break;
 
         ++count;
-        ++it;
+        ++tok_it;
     }
 
     for(int i = 0; i < count; ++i)
@@ -412,9 +412,10 @@ bool parse_alu_jmp(Inst_desc& desc, Token* const token)
     };
 
     int set_idx = -1;
-    for(int i = 0; i < alu_token_sets->size(); ++i)
+    int it = -1;
+    for(auto& set: alu_token_sets)
     {
-        std::vector<Token_type>& set = alu_token_sets[i];
+        ++it;
 
         if(set.size() != count)
             continue;
@@ -432,7 +433,7 @@ bool parse_alu_jmp(Inst_desc& desc, Token* const token)
         if(!match)
             continue;
 
-        set_idx = i;
+        set_idx = it;
     }
 
     switch(set_idx)
@@ -543,13 +544,13 @@ bool parse_alu_jmp(Inst_desc& desc, Token* const token)
         return false;
     }
 
-    if(it->type == Token_type::END)
+    if(tok_it->type == Token_type::END)
         return true;
 
     // skip comma
     ++it;
 
-    switch(it->type)
+    switch(tok_it->type)
     {
     case Token_type::JMP:
         desc.jez = true;
@@ -580,14 +581,14 @@ bool parse_alu_jmp(Inst_desc& desc, Token* const token)
         break;
 
     default:
-        printf("line %d, error: expecting one of these: jmp, je, jl, jg, jle, jge\n", it->line);
+        printf("line %d, error: expecting one of these: jmp, je, jl, jg, jle, jge\n", tok_it->line);
         return false;
     }
 
     ++it;
-    if(it->type != Token_type::END)
+    if(tok_it->type != Token_type::END)
     {
-        printf("line %d, error: expecting end of line after jump operation\n", it->line);
+        printf("line %d, error: expecting end of line after jump operation\n", tok_it->line);
         return false;
     }
 
