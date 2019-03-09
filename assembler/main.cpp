@@ -133,7 +133,7 @@ static Keyword _keywords[] = {
     {Token_type::JGE, "jge"},
     {Token_type::A, "a"}, // lower-case is easier to type
     {Token_type::D, "d"},
-    {Token_type::AT_A, "ata"},
+    {Token_type::AT_A, "[a]"},
     {Token_type::DATA, "data"},
     {Token_type::DEFINE, "define"},
 };
@@ -305,7 +305,7 @@ int lex(std::vector<Token>& tokens, const char* input_buf)
                 tokens.push_back(token);
                 continue; // skip ++input_buf
             }
-            else if(is_alphenumeric(c) || c == '_')
+            else if(is_alphenumeric(c) || c == '_' || '[')
             {
                 const char* begin = input_buf;
                 int len = 0;
@@ -315,7 +315,7 @@ int lex(std::vector<Token>& tokens, const char* input_buf)
                     ++input_buf;
                     ++len;
 
-                    if(!is_alphenumeric(*input_buf) && *input_buf != '_')
+                    if(!is_alphenumeric(*input_buf) && *input_buf != '_' && *input_buf != ']')
                         break;
                 }
 
@@ -336,7 +336,7 @@ int lex(std::vector<Token>& tokens, const char* input_buf)
             }
             else
             {
-                printf("error, not valid character '%c' on line %d\n", c, line);
+                printf("line %d, error: not valid character '%c'\n", line, c);
                 return 0;
             }
         }
@@ -368,7 +368,6 @@ bool parse_alu_jmp(Inst_desc& desc, Token* const token)
         {
             token[i].type = Token_type::A;
             desc.alu_y = Inst_desc::AT_A;
-            break;
         }
         else if(token[i].type == Token_type::INT_CONSTANT)
         {
@@ -548,7 +547,7 @@ bool parse_alu_jmp(Inst_desc& desc, Token* const token)
         return true;
 
     // skip comma
-    ++it;
+    ++tok_it;
 
     switch(tok_it->type)
     {
@@ -585,7 +584,7 @@ bool parse_alu_jmp(Inst_desc& desc, Token* const token)
         return false;
     }
 
-    ++it;
+    ++tok_it;
     if(tok_it->type != Token_type::END)
     {
         printf("line %d, error: expecting end of line after jump operation\n", tok_it->line);
@@ -797,7 +796,7 @@ int main(int argc, const char** argv)
             int idx = find_key_idx(keys, token.string.begin, token.string.len);
             if(idx == 0)
             {
-                printf("line %d, error: could not resolve %.*s\n", token.line, token.string.len, token.string.begin);
+                printf("line %d, error: could not resolve '%.*s' identifier\n", token.line, token.string.len, token.string.begin);
                 return 0;
             }
 

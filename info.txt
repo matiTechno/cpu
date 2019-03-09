@@ -7,20 +7,13 @@ Some questions and topics to investigate:
 learn basics of electronics and hardware architecture and electric physics (I'm just curious how it works and I'm working at Intel...); how silicon is used...
 https://lwn.net/Articles/250967/ - this might be a part of this course (how memory works)
 actually the fact that I learned a lot of assembly during fractal project will help me here
-The code books, and from nand to teris are also a good books. I could end this project with circut level simulation, emulator, and this kind of stuff.
-own HDL - and compile it to circuit simulation
+'code' and 'from nand to teris' are also a good books. I could end this project with circut level simulation, emulator, and this kind of stuff.
+own HDL - and compile it to circuit simulation.
 Yea, I would like to define my own hardware in HDL code - be able to simulate it, test, and that kind of stuff. Write an assembler for it. And also
 compile to graphical representation down to the transistor level and see it operate in real time.
 And maybe try to implement intel 8080?
 And some microcontroller?
 + emulate display, and audio, and input like keyboard?
-
-It was a good move to start this projects in parallel (read last sentances of n-body project).
-I feel that my motivation is comeing back.
-I can try to go with pure x11 opengl c99 to improve compile times and stuff.
-I don't need to be corss-platform and stuff. I think it is a great time and project to expiriment with things like that.
-I have not started yet with these two projects but they seem very fun and promising for me. And I'm happy about it. They are also
-quite long term. And if I succeed with them they will be a game changers in my portfolio.
 
   So my idea has clarified a little bit, here is what I plan to do:
     * design a processor in logisim, this will get me a view of what it takes to build such a processor
@@ -64,8 +57,6 @@ quite long term. And if I succeed with them they will be a game changers in my p
     rising signal and second instruction will be selected and overwrite results from the first one?
     Maybe some bios makes sure that all the circuit is in stable state before firing clock
 
-
-    Moving this to readme.txt project because it grows out of control.
 
 ...
 

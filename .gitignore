@@ -3,3 +3,4 @@
 */test.vcd
 assembler/assembler
 assembler/asm.*
+assembler/*.logisim_hex
