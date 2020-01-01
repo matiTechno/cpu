@@ -31,7 +31,7 @@ mov [a], d
 loop_fact:
 
 mov a, addr_fact_count
-;0
+0
 mov d, [a]
 mov a, input
 mov d, a - d
@@ -41,7 +41,7 @@ d, jl
 mov a, addr_mul_count
 mov [a], 1
 mov a, addr_result
-;0
+0
 mov d, [a]
 mov a, addr_mul_op
 mov [a], d
@@ -49,23 +49,23 @@ mov [a], d
 loop_mul:
 
 mov a, addr_mul_op
-;0
+0
 mov d, [a]
 mov a, addr_result
-;0
+0
 mov [a], d + [a]
 mov a, addr_mul_count
 0
 mov d, [a] + 1
 mov [a], d
 mov a, addr_fact_count
-;0
+0
 mov d, [a] - d
 mov a, loop_mul
 d, jg
 
 mov a, addr_fact_count
-;0
+0
 mov [a], [a] + 1
 mov a, loop_fact
 jmp
