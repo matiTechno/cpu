@@ -11,7 +11,7 @@ module test();
     initial begin
         $dumpfile("waveform.vcd"); // gtkwave
         $dumpvars;
-        $readmemh("prog2.hex", cpu.rom.mem, 0, 41); // todo, pad to ROM size
+        $readmemh("prog.hex", cpu.program_memory.rom, 0, 34); // todo, pad to rom size
         clk = 0;
         reset = 1;
         #2

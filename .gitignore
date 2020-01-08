@@ -1,6 +1,3 @@
-*/hello
-*/test
-*/test.vcd
+*/*.vcd
+*/a.out
 assembler/assembler
-assembler/asm.*
-assembler/*.logisim_hex
