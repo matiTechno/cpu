@@ -1,0 +1,3 @@
+read_verilog cpu.v
+synth -top mod_cpu
+show -format png mod_cpu

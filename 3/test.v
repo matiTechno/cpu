@@ -4,8 +4,9 @@ module test();
 
     reg clk;
     reg reset;
+    wire cpu_out;
 
-    mod_cpu cpu(clk, reset);
+    mod_cpu cpu(clk, reset, cpu_out);
     
     initial begin
         $dumpfile("waveform.vcd"); // gtkwave

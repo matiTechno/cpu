@@ -1,4 +1,4 @@
-module mod_cpu(input clk, input reset);
+module mod_cpu(input clk, input reset, output dummy); // dummy, so yosys does not optimize out the cpu
 
     wire [15:0] instr_addr;
     wire [15:0] instr;
@@ -34,6 +34,7 @@ module mod_cpu(input clk, input reset);
 
     assign alu_rhs = alu_rhs_sel ? ram_data : a_data;
     assign mem_data = data_sel ? instr_data : alu_result;
+    assign dummy = d_data[0];
 
     mod_rom rom(
         instr_addr,
