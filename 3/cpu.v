@@ -167,7 +167,7 @@ module mod_jump(
     input jump_g0,
     output do_jump);
 
-    assign do_jump = (data[15] & jump_l0) | (!data & jump_e0) | (~data[15] & |data[14:0] & jump_g0); 
+    assign do_jump = (data[15] & jump_l0) | (~|data[15:0] & jump_e0) | (~data[15] & |data[14:0] & jump_g0); 
 
 endmodule
 
@@ -184,7 +184,7 @@ module mod_program_counter(
         else if(do_jump)
             instr_addr <= jump_addr;
         else
-            instr_addr = instr_addr + 1;
+            instr_addr <= instr_addr + 1;
     end
 
 endmodule
@@ -222,6 +222,6 @@ module mod_instr_decoder(
     assign alu_rhs_sel = instr[15] & instr[12];
 
     assign data_sel = ~instr[15];
-    assign data = {1'b0, instr};
+    assign data = instr;
 
 endmodule
