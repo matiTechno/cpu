@@ -121,9 +121,7 @@ module mod_memory(
 
         if(store_D)
             reg_D <= in_data;
-    end
 
-    always @(negedge clk) begin
         if(store_ram)
             ram[addr] <= in_data;
     end
