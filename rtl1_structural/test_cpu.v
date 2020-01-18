@@ -4,9 +4,9 @@ module test();
 
     reg clk;
     reg reset;
-    wire cpu_out;
+    wire [15:0] cpu_out;
 
-    _cpu cpu(clk, reset, cpu_out);
+    cpu cpu1(clk, reset, cpu_out);
 
     initial begin
         $dumpfile("waveform.vcd"); // gtkwave
@@ -16,7 +16,7 @@ module test();
         #2
         reset = 0;
         #1000
-        $display("result: %d", cpu.memory.ram_data8[0]);
+        $display("result: %d", cpu_out);
         $finish;
     end
 

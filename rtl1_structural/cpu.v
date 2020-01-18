@@ -1,7 +1,11 @@
 // first number in a mux / dmux name is a number of select lines, second is a line bit width
 // todo, memory row and column decoding - right now I don't know much about high impedance which is necessary to accomplish this
+// program calculates !7 and set reg_D_out to a result
 
-module _cpu(input clk, input reset, output dummy);
+module cpu(
+    input clk,
+    input reset,
+    output [15:0] reg_D_out);
 
     // decoded instr
     wire jump_l0;
@@ -33,7 +37,7 @@ module _cpu(input clk, input reset, output dummy);
     wire [15:0] mem_in_data;
     wire jump;
 
-    assign dummy = A_data[0];
+    assign reg_D_out = D_data;
 
     _mux1_16 mu1(alu_rhs_sel, A_data, ram_data, alu_rhs);
     _mux1_16 mu2(mem_in_sel, alu_result, imm_data, mem_in_data);
@@ -210,7 +214,6 @@ module _memory(
     wire [15:0] ram_data8 [7:0];
     wire [15:0] ram_data4 [3:0];
     wire [15:0] ram_data2 [1:0];
-    wire [15:0] deb_cell0;
 
     generate
         for(i = 0; i < 8; i = i + 1)
@@ -285,8 +288,10 @@ module _progmem(
     assign data[30] = 16'h9dc8;
     assign data[31] = 16'h6;
     assign data[32] = 16'h8007;
-    assign data[33] = 16'h21;
-    assign data[34] = 16'h8007;
+    assign data[33] = 16'h0;
+    assign data[34] = 16'h9c10;
+    assign data[35] = 16'h23;
+    assign data[36] = 16'h8007;
 
     genvar i;
 
@@ -350,8 +355,10 @@ module _D_flip_flop(
     input clk,
     output Q);
 
-    // I suspect it may not work because of icarus verilog bug,
-    // commented out and replaced with a reg primitive
+    // I suspect it may not work because of an icarus verilog bug,
+    // commented out and replaced with a reg primitive.
+    // Well, it works even worse in verilator, haha. I give up.
+    // It was fun exercise but I don't know too many things to debug or evaluate this.
     /*
     wire Q_master, enable_master, enable_slave, n_clk;
 
