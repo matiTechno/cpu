@@ -350,6 +350,9 @@ module _D_flip_flop(
     input clk,
     output Q);
 
+    // I suspect it may not work because of icarus verilog bug,
+    // commented out and replaced with a reg primitive
+    /*
     wire Q_master, enable_master, enable_slave, n_clk;
 
     _not no(clk, n_clk);
@@ -357,6 +360,15 @@ module _D_flip_flop(
     _and an2(enable, clk, enable_slave);
     _gated_D_latch master(data, enable_master, Q_master);
     _gated_D_latch slave(Q_master, enable_slave, Q);
+    */
+
+    reg r;
+    assign Q = r;
+
+    always @(posedge clk) begin
+        if(enable)
+            r <= data;
+    end
 
 endmodule
 
