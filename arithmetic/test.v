@@ -53,8 +53,8 @@ module test();
         $display("result_sub: %d", $signed(result_sub));
 
         reset = 1;
-        a = 5;
-        b = 1;
+        a = 666;
+        b = 21;
         #2
         reset = 0;
         #31
@@ -100,6 +100,8 @@ module div16(
 
 endmodule
 
+// note: this could probably be done with a module parameter and a recursive generation
+
 module mul16_comb(
     input [15:0] a,
     input [15:0] b,
@@ -132,7 +134,6 @@ module mul16_comb(
 
 endmodule
 
-// note: this could probably be done with module parameter and recursive generation
 module mul16(
     input clk,
     input reset,
