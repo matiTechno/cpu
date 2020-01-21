@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
+#include <stdlib.h>
 
 // naming convention
 // exponent = exp + bias (127)
@@ -36,7 +38,7 @@ struct bit32
 
 float convert_int_to_float(int _arg)
 {
-    // a little shortcut, I don't want to implement an adder.
+    // a little shortcut, don't want to build an adder for ~arg + 1;
     int sign = _arg < 0;
     if(sign)
         _arg = -_arg;
@@ -63,41 +65,280 @@ float convert_int_to_float(int _arg)
 
     // set exponent
     for(i = 0; i < 8; ++i)
-        result[23 + i] = exponent & (1 << i) ? 1 : 0;
+        result[23 + i] = (bool)(exponent & (1 << i));
 
     unsigned int ui_result = result.pack();
     return *(float*)&ui_result;
 }
 
-int convert_float_to_int(int _arg)
+int convert_float_to_int(float _arg)
 {
     bit32 arg(&_arg);
-    return {};
+
+    int exponent = 0;
+    for(int i = 0; i < 8; ++i)
+        exponent += arg[23 + i] * (1 << i);
+
+    int exp = exponent - 127;
+
+    int result = exp >= 0 ? (1 << exp) : 0;
+
+    for(int i = exp - 1, k = 22; i >= 0 && k >= 0; --i, --k)
+        result += arg[k] << i;
+
+    if(arg[31])
+        result *= -1;
+
+    return result;
 }
 
-float add_float(int _arg1, int _arg2)
+float add_float(float _arg1, float _arg2)
 {
     bit32 arg1(&_arg1);
     bit32 arg2(&_arg2);
     return {};
 }
 
-float sub_float(int _arg1, int _arg2)
+float sub_float(float _arg1, float _arg2)
 {
     return {};
 }
 
-float mul_float(int _arg1, int _arg2)
+float mul_float(float _arg1, float _arg2)
 {
     return {};
 }
 
-float div_float(int _arg1, int _arg2)
+float div_float(float _arg1, float _arg2)
 {
     return {};
 }
 
-void print_f32(float _arg)
+// e.g. "1.33434" (base ten)
+float string_dec_to_float(const char* str)
+{
+    assert(str);
+
+    bit32 result;
+    result.set_zero();
+
+    if(*str == '-')
+    {
+        result[31] = 1;
+        ++str;
+    }
+
+    const char* it = str;
+
+    while(*it && *it != '.')
+        ++it;
+
+    const char* frac_it = it;
+    if(*frac_it == '.')
+        ++frac_it;
+
+    --it;
+    int multiplier = 1;
+    int int_part = 0;
+
+    while(it >= str)
+    {
+        int digit = *it - '0';
+        int_part += digit * multiplier;
+        multiplier *=  10;
+        --it;
+    }
+
+    it = frac_it;
+
+    while(*it)
+        ++it;
+
+    --it;
+    multiplier = 1;
+    int frac_part = 0;
+
+    while(it >= frac_it)
+    {
+        int digit = *it - '0';
+        frac_part += digit * multiplier;
+        multiplier *= 10;
+        --it;
+    }
+
+    int init_sub_fraction = 5 * multiplier / 10;
+
+    //printf("int part: %d\n", int_part);
+    //printf("frac part: %d\n", frac_part);
+
+    int exp = 0;
+    bool init = false;
+    int frac_pos = 22;
+
+    for(int i = 31; i >= 0; --i)
+    {
+        if(init)
+        {
+            result[frac_pos] = (bool)(int_part & (1 << i));
+            frac_pos -= 1;
+        }
+        else if(int_part & (1 << i))
+        {
+            init = true;
+            exp = i;
+        }
+    }
+
+    // this is to increase some precision, I don't know if it is a good approach
+    // it seems that it still loses some precison
+    for(;;)
+    {
+        int tmp = frac_part * 10;
+        if(tmp <= frac_part)
+            break;
+        frac_part = tmp;
+        init_sub_fraction *= 10;
+    }
+
+    while(frac_part && frac_pos >= 0 && init_sub_fraction)
+    {
+        int diff = frac_part - init_sub_fraction;
+        bool fit = diff >= 0;
+
+        if(init)
+        {
+            result[frac_pos] = fit;
+            frac_pos -= 1;
+        }
+        else
+        {
+            exp -= 1;
+
+            if(fit)
+                init = true;
+        }
+
+        if(fit)
+            frac_part -= init_sub_fraction;
+
+        init_sub_fraction /= 2;
+
+    }
+
+    exp += init * 127;
+
+    for(int i = 0; i < 8; ++i)
+        result[23 + i] = (bool)(exp & (1 << i));
+
+    int packed_result = result.pack();
+    return *(float*)&packed_result;
+}
+
+const char* float_to_string_dec(float _arg)
+{
+    bit32 arg(&_arg);
+
+    int sign = arg[31];
+    int exponent = 0;
+
+    for(int i = 0; i < 8; ++i)
+        exponent += arg[23 + i] << i;
+
+    int exp = exponent - 127;
+
+    int int_part = 0;
+    int frac_part = 0;
+    int frac_pos = 22;
+    int frac_add = 1000000000; // 10^9
+
+    if(exp >= 0)
+    {
+        int_part = 1 << exp;
+        exp -= 1;
+    }
+    else
+    {
+        frac_add = frac_add >> -exp;
+        frac_part = frac_add;
+    }
+
+    frac_add = frac_add >> 1;
+
+    while(frac_pos >= 0 && exp >= 0)
+    {
+        int_part += arg[frac_pos] << exp;
+        --frac_pos;
+        --exp;
+    }
+
+    while(frac_pos >= 0 && frac_add > 0)
+    {
+        frac_part += arg[frac_pos] * frac_add;
+        frac_add = frac_add >> 1;
+        frac_pos -= 1;
+    }
+
+    //printf("int part: %d\n", int_part);
+    //printf("frac part: %d\n", frac_part);
+
+    char str_int[1024];
+    char str_frac[1024];
+
+    char* str_int_it = str_int;
+
+    do
+    {
+        *str_int_it = '0' + (int_part % 10);
+        int_part /= 10;
+        str_int_it += 1;
+    }
+    while(int_part);
+
+    *str_int_it = 0;
+
+    str_int_it -= 1;
+    char* str_int_beg = str_int;
+
+    // reverse
+    while(str_int_beg < str_int_it)
+    {
+        char tmp = *str_int_beg;
+        *str_int_beg = *str_int_it;
+        *str_int_it = tmp;
+        ++str_int_beg;
+        --str_int_it;
+    }
+
+    char* str_frac_it = str_frac;
+
+    do
+    {
+        *str_frac_it = '0' + (frac_part % 10);
+        frac_part /= 10;
+        str_frac_it += 1;
+    }
+    while(frac_part);
+
+    *str_frac_it = 0;
+    str_frac_it -= 1;
+    char* str_frac_beg = str_frac;
+
+    // reverse
+    while(str_frac_beg < str_frac_it)
+    {
+        char tmp = *str_frac_beg;
+        *str_frac_beg = *str_frac_it;
+        *str_frac_it = tmp;
+        ++str_frac_beg;
+        --str_frac_it;
+    }
+
+    char* return_string = (char*)malloc(1000);
+    sprintf(return_string, "%s%s.%s", sign ? "-" : "", str_int, str_frac);
+    return return_string;
+}
+
+void disasm_f32(float _arg)
 {
     printf("disassembly of: %f\n", _arg);
     bit32 arg(&_arg);
@@ -136,11 +377,25 @@ void print_f32(float _arg)
 
 int main()
 {
-    print_f32(55.5f);
-    print_f32(-0.625111);
-    print_f32(0);
+    disasm_f32(55.5f);
+    disasm_f32(-0.625111);
+    disasm_f32(0);
 
     printf("%f\n", convert_int_to_float(-666069));
+
+    printf("%d\n", convert_float_to_int(-0.555));
+    printf("%d\n", convert_float_to_int(-22.555));
+    printf("%d\n", convert_float_to_int(10));
+    printf("%d\n", convert_float_to_int(0));
+
+    printf("%f\n", string_dec_to_float("-100.6843"));
+    printf("%f\n", string_dec_to_float("-0.225"));
+    printf("%f\n", string_dec_to_float("0"));
+
+    printf("%s\n", float_to_string_dec(-5059.99954));
+    printf("%s\n", float_to_string_dec(0.f));
+    printf("%s\n", float_to_string_dec(6666));
+    printf("%s\n", float_to_string_dec(69.69001));
 
     return 0;
 }
