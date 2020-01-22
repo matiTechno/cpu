@@ -96,7 +96,135 @@ float add_float(float _arg1, float _arg2)
 {
     bit32 arg1(&_arg1);
     bit32 arg2(&_arg2);
-    return {};
+
+    int exponent1 = 0, exponent2 = 0;;
+
+    for(int i = 0; i < 8; ++i)
+    {
+        exponent1 += arg1[23 + i] << i;
+        exponent2 += arg2[23 + i] << i;
+    }
+
+    int exp1 = exponent1 - 127;
+    int exp2 = exponent2 - 127;
+    int shift_count = exp1 - exp2;
+
+    // swap, arg1 is set to an arg with a bigger exponent
+    if(shift_count < 0)
+    {
+        bit32 tmp = arg1;
+        arg1 = arg2;
+        arg2 = tmp;
+        exp1 = exp2;
+        shift_count = -shift_count;
+    }
+
+    if(shift_count > 23)
+        shift_count = 23;
+
+    // make leading one not implicit
+    for(int i = 0; i < 22; ++i)
+    {
+        arg1[i] = arg1[i + 1];
+        arg2[i] = arg2[i + 1];
+    }
+    arg1[22] = 1;
+    arg2[22] = 1;
+
+    // adjust fraction of a smaller exponent number
+    for(int i = 0; i < 23 - shift_count; ++i)
+        arg2[i] = arg2[i + shift_count];
+
+    for(int i = 0; i < shift_count; ++i)
+        arg2[22 - i] = 0;
+
+    // sum, same signs
+    if(arg1[31] == arg2[31])
+    {
+        int carry = 0;
+
+        for(int i = 0; i < 23; ++i)
+        {
+            int carry_tmp = (arg1[i] & arg2[i]) | (carry & (arg1[i] | arg2[i]));
+            arg1[i] = arg1[i] ^ arg2[i] ^ carry;
+            carry = carry_tmp;
+        }
+
+        if(carry)
+        {
+            exp1 += 1;
+            int exponent = exp1 + 127;
+
+            for(int i = 0; i < 8; ++i)
+                arg1[23 + i] = (bool)(exponent & (1 << i));
+        }
+        else
+        {
+            for(int i = 22; i > 0; --i)
+                arg1[i] = arg1[i - 1];
+
+            arg1[0] = 0;
+        }
+    }
+    // difference
+    else
+    {
+        for(int i = 22; i >= 0; --i)
+        {
+            if(arg1[i] < arg2[i])
+            {
+                // we want to subtract from the bigger absolute value
+                bit32 tmp = arg1;
+                arg1 = arg2;
+                arg2 = tmp;
+                break;
+            }
+            else if(arg2[i] < arg1[i])
+                break;
+        }
+
+        int borrow = 0;
+
+        for(int i = 0; i < 23; ++i)
+        {
+            int borrow_tmp = (borrow & ~arg1[i]) | (~arg1[i] & arg2[i]) | (arg2[i] & borrow);
+            arg1[i] = arg1[i] ^ arg2[i] ^ borrow;
+            borrow = borrow_tmp;
+        }
+
+        assert(!borrow); // abs(arg1) > abs(arg2)
+
+        int lshift = 0;
+        for(int i = 22; i >= 0; --i)
+        {
+            lshift += 1;
+
+            if(arg1[i])
+                break;
+        }
+
+        int exponent = 0;
+
+        if(lshift == 23)
+            exponent = 0; // exponent must be 0 if the number is 0
+        else
+            exponent = exp1 - (lshift - 1) + 127; // don't decrease exponent for shifting the implicit one
+
+        // perform shift
+        for(int i = 0; i < 23 - lshift; ++i)
+            arg1[22 - i] = arg1[22 - i - lshift];
+
+        // clear shifted bits
+        for(int i = 0; i < lshift; ++i)
+            arg1[i] = 0;
+
+        // set the exponent
+        for(int i = 0; i < 8; ++i)
+            arg1[23 + i] = (bool)(exponent & (1 << i));
+    }
+
+    int packed = arg1.pack();
+    return *(float*)&packed;
 }
 
 float sub_float(float _arg1, float _arg2)
@@ -396,6 +524,12 @@ int main()
     printf("%s\n", float_to_string_dec(0.f));
     printf("%s\n", float_to_string_dec(6666));
     printf("%s\n", float_to_string_dec(69.69001));
+
+    printf("%f\n", add_float(1.35, 64.9));
+    printf("%f\n", add_float(-443.439892, 599.4323211));
+    printf("%f\n", add_float(55.55, -55.55));
+    printf("%f\n", add_float(-600.3, 200.4));
+    printf("%f\n", add_float(55.543, -0.543));
 
     return 0;
 }
