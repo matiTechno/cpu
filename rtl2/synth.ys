@@ -1,0 +1,3 @@
+read_verilog -sv core.sv
+synth -top core
+show -format png core

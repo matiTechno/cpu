@@ -1,0 +1,73 @@
+32 32-bit registers
+
+r0 - hard-wired to 0
+...
+r31
+
+instruction encoding:
+register type  (r-type): opcode, reg1, reg2, reg3, alu_opcode, pad0
+immediate type (i-type): opcode, reg1, reg2, immediate value
+
+opcode     - 6 bits
+reg        - 5 bits
+alu_opcode - 6 bits
+immediate  - 16 bits
+pad0       - 5 bits
+
+opcode == 0, r-type instruction
+opcode  > 0, i-type instruction
+
+alu_opcode:
+0 - add
+1 - sub
+2 - and
+3 - or
+4 - xor
+5 - nor
+6 - sll
+7 - srl
+8 - sra
+
+i-type instructions (by opcode):
+
+1)  beq reg1, reg2, imm
+2)  bne ...
+3)  blt     // less than
+4)  bltu    // less than unsigned
+5)  ble     // less equal
+6)  bleu
+7)  bgt     // greater
+8)  bgtu
+9)  bge     // greater equal
+10) bgeu
+
+11) b imm   // unconditional branch
+
+12) ldr reg2, imm(reg1)    // reg2 = *(reg1 + imm); if reg2 is r0, then imm is an absolute address
+13) str reg2, imm(reg1)    // *(reg1 + imm) = reg2
+
+14) addi reg2, reg1, imm   // reg2 = reg1 + imm
+15) andi ...
+16) ori
+17) xori
+18) slli                   // shift left logical
+19) srli                   // shift right logical
+20) srai                   // shift right arithmetic
+
+
+
+r-type instructions (opcode == 0):
+
+add reg3, reg1, reg2   // reg3 = reg1 + reg2
+sub ...
+and
+or
+xor
+nor                    // if reg2 is r0, reg3 = ~reg1
+sll
+srl
+sra
+
+
+immediate operands for logical instructions are zero extended, for arithmetic
+they are sign extended
