@@ -61,7 +61,7 @@ module core(
 
     pc pc(clk, reset, imm32, branch_en, instr_addr);
 
-    assign dout = reg_dout1; // debug stuff
+    assign dout = alu_dout; // debug stuff
 
 endmodule
 
@@ -195,7 +195,6 @@ module control_unit(
                 bgtu = 1;
             end
             11: begin // b
-                alu_opcode = `ALU_SUB;
                 beq = 1;
                 bne = 1;
             end
@@ -339,7 +338,8 @@ module rom(
 
     assign dout = reg_file[addr[7:0]];
 
-    // todo, read rom file
+    initial $readmemh("a.hex", reg_file);
+
 endmodule
 
 module ram(
