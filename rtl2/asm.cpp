@@ -4,8 +4,7 @@
 #include <assert.h>
 
 // todo:
-// mov, neg pseudo-instructions
-// 0 alias for r0 in r-type instructions
+// mov, neg, push, pop pseudo-instructions; this will require a change in a label processing
 
 template<typename T>
 struct asm_array
@@ -96,6 +95,11 @@ struct asm_array
     }
 };
 
+#define ASM_ROM_SIZE 255
+#define ASM_LR 31
+#define ASM_SP 30
+#define ASM_FP 29
+
 enum asm_token_type
 {
     TOK_EOF,
@@ -142,6 +146,13 @@ enum asm_token_type
     TOK_SLLI,
     TOK_SRLI,
     TOK_SRAI,
+
+    TOK_BL,
+    TOK_BX,
+
+    TOK_LR,
+    TOK_SP,
+    TOK_FP,
 };
 
 struct asm_keyword
@@ -180,6 +191,11 @@ static asm_keyword _keywords[] = {
     "slli", TOK_SLLI,
     "srli", TOK_SRLI,
     "srai", TOK_SRAI,
+    "bl",   TOK_BL,
+    "bx",   TOK_BX,
+    "lr",   TOK_LR,
+    "sp",   TOK_SP,
+    "fp",   TOK_FP,
 };
 
 struct asm_str
@@ -432,7 +448,27 @@ asm_token* lex(char* source)
 
                 if(token_type != TOK_EOF)
                 {
-                    lexer.add_token({token_type});
+                    asm_token tok;
+                    tok.type = token_type;
+
+                    // resolve register aliases
+                    switch(token_type)
+                    {
+                    case TOK_LR:
+                        tok.type = TOK_REG;
+                        tok.reg_id = ASM_LR;
+                        break;
+                    case TOK_SP:
+                        tok.type = TOK_REG;
+                        tok.reg_id = ASM_SP;
+                        break;
+                    case TOK_FP:
+                        tok.type = TOK_REG;
+                        tok.reg_id = ASM_FP;
+                        break;
+                    }
+
+                    lexer.add_token(tok);
                     break;
                 }
 
@@ -625,6 +661,24 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
 
             consume(token, TOK_INT_LITERAL, "expected an integer literal");
         }
+        else if(type == TOK_BL)
+        {
+            instr.opcode = 21;
+            ++token;
+
+            instr.immediate = resolve_label(*token, labels);
+            consume(token, TOK_IDENTIFIER, "expected a label identifier");
+
+            instr.reg2 = ASM_LR;
+        }
+        else if(type == TOK_BX)
+        {
+            instr.opcode = 22;
+            ++token;
+
+            instr.reg1 = token->reg_id;
+            consume_reg(token);
+        }
         else
         {
             printf("error; line %d, col %d; an unexpected token\n", token->line, token->col);
@@ -657,8 +711,6 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
     return code;
 }
 
-#define ROM_SIZE 255
-
 int main(int argc, const char** argv)
 {
     if(argc != 2)
@@ -688,9 +740,9 @@ int main(int argc, const char** argv)
     asm_array<asm_label> labels = collect_labels(tokens);
     asm_array<unsigned int> code = generate_code(tokens, labels);
 
-    if(code.size > ROM_SIZE) // rom size
+    if(code.size > ASM_ROM_SIZE) // rom size
     {
-        printf("error; code (%d words) does not fit into %d-word rom image\n", code.size, ROM_SIZE);
+        printf("error; code (%d words) does not fit into %d-word rom image\n", code.size, ASM_ROM_SIZE);
         return 1;
     }
 

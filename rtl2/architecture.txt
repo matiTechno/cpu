@@ -4,6 +4,11 @@ r0 - hard-wired to 0
 ...
 r31
 
+register aliases:
+r31 - lr - link register
+r30 - sp - stack pointer
+r29 - fp - frame pointer
+
 instruction encoding:
 register type  (r-type): opcode, reg1, reg2, reg3, alu_opcode, pad0
 immediate type (i-type): opcode, reg1, reg2, immediate value
@@ -55,6 +60,8 @@ i-type instructions (by opcode):
 20) srai                   // shift right arithmetic
 
 
+21) bl imm  // branch and link; reg2 must be set to lr
+22) bx reg1 // branch exchange, sets pc to reg1
 
 r-type instructions (opcode == 0):
 
@@ -70,4 +77,4 @@ sra
 
 
 immediate operands for logical instructions are zero extended, for arithmetic
-they are sign extended
+they are sign extended (currently only addi instruction)

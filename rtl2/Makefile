@@ -5,7 +5,7 @@ obj_dir: sim.cpp core.sv
 	make -C obj_dir -f Vcore.mk
 
 asm: asm.cpp
-	g++ -g -Wall -Wextra asm.cpp -o asm -Wno-missing-field-initializers
+	g++ -g -Wall -Wextra asm.cpp -o asm -Wno-missing-field-initializers -Wno-switch
 
 .PHONY: clean synth
 

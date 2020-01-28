@@ -15,7 +15,7 @@ module core(
     output dout_ready
     );
 
-    wire [31:0] instr_addr, instr;
+    wire [31:0] instr_addr, instr, pc_next;
 
     rom rom(instr_addr, instr);
 
@@ -26,29 +26,30 @@ module core(
     instr_decoder instr_decoder(instr, opcode, rtype_opcode, reg1, reg2, reg3, imm16);
 
     wire [5:0] alu_opcode;
-    wire sel_reg_write, sel_reg_din, sel_alu_rhs, we_reg, we_ram, beq, bne, blt, bltu, bgt, bgtu;
+    wire sel_reg_write, sel_alu_rhs, sel_branch_addr, we_reg, we_ram, sign_extend_imm, beq, bne, blt, bltu, bgt, bgtu;
+    wire [1:0] sel_reg_din;
 
-    control_unit control_unit(opcode, rtype_opcode, alu_opcode, sel_reg_write, sel_reg_din, sel_alu_rhs, we_reg, we_ram,
+    control_unit control_unit(opcode, rtype_opcode, alu_opcode, sel_reg_write, sel_reg_din, sel_alu_rhs, sel_branch_addr, we_reg, we_ram, sign_extend_imm,
         beq, bne, blt, bltu, bgt, bgtu);
 
     wire [31:0] ram_dout, alu_dout;
+    reg [31:0] reg_din;
 
-    wire [31:0] reg_din = sel_reg_din ? ram_dout : alu_dout;
+    always_comb begin
+        if(sel_reg_din == 0)
+            reg_din = alu_dout;
+        else if(sel_reg_din == 1)
+            reg_din = ram_dout;
+        else
+            reg_din = pc_next;
+    end
+
     wire [4:0] reg_write = sel_reg_write ? reg3 : reg2;
     wire [31:0] reg_dout1, reg_dout2;
 
     register_file register_file(clk, reg_din, we_reg, reg_write, reg1, reg2, reg_dout1, reg_dout2);
 
-    reg [31:0] imm32;
-
-    // sign extend imm16 for arithmetic operations, else zero extend
-    always_comb begin
-        if(alu_opcode == `ALU_ADD | alu_opcode == `ALU_SUB)
-            imm32 = { {16{imm16[15]}}, imm16};
-        else
-            imm32 = { {16{1'b0}}, imm16};
-    end
-
+    wire [31:0] imm32 = sign_extend_imm ? { {16{imm16[15]}}, imm16} : { {16{1'b0}}, imm16};
     wire [31:0] alu_din_rhs = sel_alu_rhs ? imm32 : reg_dout2;
     wire carry, borrow;
 
@@ -60,7 +61,9 @@ module core(
 
     branch_unit branch_unit(~|alu_dout, borrow, reg_dout1[31], alu_din_rhs[31], beq, bne, blt, bltu, bgt, bgtu, branch_en);
 
-    pc pc(clk, reset, imm32, branch_en, instr_addr);
+    wire [31:0] branch_addr = sel_branch_addr ? reg_dout1 : imm32;
+
+    pc pc(clk, reset, branch_addr, branch_en, instr_addr, pc_next);
 
     // IO, writes at address 0 are used to communicate with the outside world
     assign dout = reg_dout2;
@@ -119,10 +122,12 @@ module control_unit(
     input [5:0] rtype_opcode,
     output reg [5:0] alu_opcode,
     output reg sel_reg_write,
-    output reg sel_reg_din,
+    output reg [1:0] sel_reg_din,
     output reg sel_alu_rhs,
+    output reg sel_branch_addr,
     output reg we_reg,
     output reg we_ram,
+    output reg sign_extend_imm,
     output reg beq,
     output reg bne,
     output reg blt,
@@ -136,8 +141,10 @@ module control_unit(
         sel_reg_write = 0;
         sel_reg_din = 0;
         sel_alu_rhs = 0;
+        sel_branch_addr = 0;
         we_reg = 0;
         we_ram = 0;
+        sign_extend_imm = 0;
         beq = 0;
         bne = 0;
         blt = 0;
@@ -216,6 +223,7 @@ module control_unit(
                 alu_opcode = `ALU_ADD;
                 sel_alu_rhs = 1;
                 we_reg = 1;
+                sign_extend_imm = 1;
             end
             15: begin // andi
                 alu_opcode = `ALU_AND;
@@ -247,6 +255,17 @@ module control_unit(
                 sel_alu_rhs = 1;
                 we_reg = 1;
             end
+            21: begin // bl
+                sel_reg_din = 2;
+                we_reg = 1;
+                beq = 1;
+                bne = 1;
+            end
+            22: begin // bx
+                sel_branch_addr = 1;
+                beq = 1;
+                bne = 1;
+            end
         endcase
     end
 
@@ -257,18 +276,18 @@ module pc(
     input reset,
     input [31:0] din,
     input branch_en,
-    output reg [31:0] dout
+    output reg [31:0] count,
+    output wire [31:0] next
     );
 
-    wire [31:0] next;
     wire carry;
-    add32 add32(dout, 32'd1, next, carry);
+    add32 add32(count, 32'd1, next, carry);
 
     always_ff @(posedge clk) begin
         if(reset)
-            dout <= 32'd0;
+            count <= 32'd0;
         else
-            dout <= branch_en ? din : next;
+            count <= branch_en ? din : next;
     end
 
 endmodule
@@ -284,15 +303,15 @@ module register_file(
     output [31:0] dout2
     );
 
-    reg [31:0] reg_file[31:1];
+    reg [31:0] reg_array[31:1];
     wire [31:0] r0 = 32'd0;
 
-    assign dout1 = |reg_read1 ? reg_file[reg_read1] : r0;
-    assign dout2 = |reg_read2 ? reg_file[reg_read2] : r0;
+    assign dout1 = |reg_read1 ? reg_array[reg_read1] : r0;
+    assign dout2 = |reg_read2 ? reg_array[reg_read2] : r0;
 
     always_ff @(posedge clk) begin
         if(we & |reg_write) // don't write to r0
-            reg_file[reg_write] <= din;
+            reg_array[reg_write] <= din;
     end
 
 endmodule
@@ -338,11 +357,11 @@ module rom(
     output [31:0] dout
     );
 
-    reg [31:0] reg_file[255:0];
+    reg [31:0] reg_array[255:0];
 
-    assign dout = reg_file[addr[7:0]];
+    assign dout = reg_array[addr[7:0]];
 
-    initial $readmemh("a.hex", reg_file);
+    initial $readmemh("a.hex", reg_array);
 
 endmodule
 
@@ -354,13 +373,13 @@ module ram(
     output [31:0] dout
     );
 
-    reg [31:0] reg_file[255:0];
+    reg [31:0] reg_array[255:0];
 
-    assign dout = reg_file[addr[7:0]];
+    assign dout = reg_array[addr[7:0]];
 
     always_ff @(posedge clk) begin
         if(we)
-            reg_file[addr[7:0]] <= din;
+            reg_array[addr[7:0]] <= din;
     end
 
 endmodule
