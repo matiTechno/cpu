@@ -7,6 +7,8 @@
 `define ALU_SLL 6
 `define ALU_SRL 7
 `define ALU_SRA 8
+`define ALU_MUL 9
+`define ALU_DIV 10
 
 module core(
     input clk,
@@ -213,11 +215,13 @@ module control_unit(
                 sel_reg_din = 1;
                 sel_alu_rhs = 1;
                 we_reg = 1;
+                sign_extend_imm = 1;
             end
             13: begin // str
                 alu_opcode = `ALU_ADD;
                 sel_alu_rhs = 1;
                 we_ram = 1;
+                sign_extend_imm = 1;
             end
             14: begin // addi
                 alu_opcode = `ALU_ADD;
@@ -255,13 +259,25 @@ module control_unit(
                 sel_alu_rhs = 1;
                 we_reg = 1;
             end
-            21: begin // bl
+            21: begin // muli
+                alu_opcode = `ALU_MUL;
+                sel_alu_rhs = 1;
+                we_reg = 1;
+                sign_extend_imm = 1;
+            end
+            22: begin // divi
+                alu_opcode = `ALU_DIV;
+                sel_alu_rhs = 1;
+                we_reg = 1;
+                sign_extend_imm = 1;
+            end
+            23: begin // bl
                 sel_reg_din = 2;
                 we_reg = 1;
                 beq = 1;
                 bne = 1;
             end
-            22: begin // bx
+            24: begin // bx
                 sel_branch_addr = 1;
                 beq = 1;
                 bne = 1;
@@ -325,12 +341,13 @@ module alu(
     output borrow
     );
 
-    reg [31:0] sum, diff;
+    reg [31:0] sum, diff, mul;
     wire [4:0] shift_count = din_rhs[4:0];
     wire [31:0] srl; // shift right logical
     
     add32 add32(din_lhs, din_rhs, sum, carry);
     sub32 sub32(din_lhs, din_rhs, diff, borrow);
+    mul32 mul32(din_lhs, din_rhs, mul);
     assign srl = din_lhs >> shift_count;
 
     always_comb begin
@@ -347,6 +364,8 @@ module alu(
             `ALU_SLL: dout = din_lhs << shift_count;
             `ALU_SRL: dout = srl;
             `ALU_SRA: dout = {din_lhs[31], srl[30:0]}; // shift right arithmetic
+            `ALU_MUL: dout = mul;
+            `ALU_DIV: dout = mul; // todo
         endcase
     end
 
@@ -381,6 +400,40 @@ module ram(
         if(we)
             reg_array[addr[7:0]] <= din;
     end
+
+endmodule
+
+module mul32(
+    input [31:0] a,
+    input [31:0] b,
+    output [31:0] product
+    );
+
+    reg [31:0] part32 [31:0];
+    wire [31:0] part16 [15:0];
+    wire [31:0] part8 [7:0];
+    wire [31:0] part4 [3:0];
+    wire [31:0] part2 [1:0];
+
+    always_comb begin
+        int i;
+        for(i = 0; i < 32; i = i + 1)
+            part32[i] = (a & {32{b[i]}}) << i;
+    end
+
+    genvar i;
+    generate
+        for(i = 0; i < 32; i = i + 2)
+            add32 add32(part32[i], part32[i + 1], part16[i / 2]);
+        for(i = 0; i < 16; i = i + 2)
+            add32 add32(part16[i], part16[i + 1], part8[i / 2]);
+        for(i = 0; i < 8; i = i + 2)
+            add32 add32(part8[i], part8[i + 1], part4[i / 2]);
+        for(i = 0; i < 4; i = i + 2)
+            add32 add32(part4[i], part4[i + 1], part2[i / 2]);
+    endgenerate
+
+    add32 add32(part2[0], part2[1], product);
 
 endmodule
 

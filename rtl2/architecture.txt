@@ -32,10 +32,12 @@ alu_opcode:
 6 - sll
 7 - srl
 8 - sra
+9 - mul    // note: mul and div currently support only signed arithmetic and store the result only in 32 bits
+10 - div
 
 i-type instructions (by opcode):
 
-1)  beq reg1, reg2, imm
+1)  beq reg1, reg2, imm    // imm is an absolute address of the program memory
 2)  bne ...
 3)  blt     // less than
 4)  bltu    // less than unsigned
@@ -58,10 +60,12 @@ i-type instructions (by opcode):
 18) slli                   // shift left logical
 19) srli                   // shift right logical
 20) srai                   // shift right arithmetic
+21) muli
+22) divi
 
 
-21) bl imm  // branch and link; reg2 must be set to lr
-22) bx reg1 // branch exchange, sets pc to reg1
+23) bl imm  // branch and link; reg2 must be set to lr
+24) bx reg1 // branch exchange, sets pc to reg1
 
 r-type instructions (opcode == 0):
 
@@ -77,4 +81,5 @@ sra
 
 
 immediate operands for logical instructions are zero extended, for arithmetic
-they are sign extended (currently only addi instruction)
+they are sign extended (addi, muli, divi)
+sign extension also happens for ldr and str instructions

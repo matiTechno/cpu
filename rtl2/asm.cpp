@@ -119,6 +119,8 @@ enum asm_token_type
     TOK_SLL,
     TOK_SRL,
     TOK_SRA,
+    TOK_MUL,
+    TOK_DIV,
 
     TOK_BEQ,
     TOK_BNE,
@@ -143,6 +145,8 @@ enum asm_token_type
     TOK_SLLI,
     TOK_SRLI,
     TOK_SRAI,
+    TOK_MULI,
+    TOK_DIVI,
 
     TOK_BL,
     TOK_BX,
@@ -168,6 +172,8 @@ static asm_keyword _keywords[] = {
     "sll",  TOK_SLL,
     "srl",  TOK_SRL,
     "sra",  TOK_SRA,
+    "mul",  TOK_MUL,
+    "div",  TOK_DIV,
     "beq",  TOK_BEQ,
     "bne",  TOK_BNE,
     "blt",  TOK_BLT,
@@ -188,6 +194,8 @@ static asm_keyword _keywords[] = {
     "slli", TOK_SLLI,
     "srli", TOK_SRLI,
     "srai", TOK_SRAI,
+    "muli", TOK_MULI,
+    "divi", TOK_DIVI,
     "bl",   TOK_BL,
     "bx",   TOK_BX,
     "lr",   TOK_LR,
@@ -630,7 +638,7 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
             consume_reg(token);
             consume(token, TOK_PAREN_RIGHT, "expected ')'");
         }
-        else if(type >= TOK_ADDI && type <= TOK_SRAI)
+        else if(type >= TOK_ADDI && type < TOK_BL)
         {
             instr.opcode = 14 + (type - TOK_ADDI);
             ++token;
@@ -645,10 +653,13 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
 
             instr.immediate = token->int_literal;
 
-            if(type == TOK_ADDI && ( instr.immediate >= (1 << 15) || instr.immediate < -(1 << 15) ))
+            if(type == TOK_ADDI || type == TOK_MULI || type == TOK_DIVI)
             {
-                printf("error; line %d, col %d; integer literal does not fit into 16 bits\n", token->line, token->col);
-                exit(1);
+                if(instr.immediate >= (1 << 15) || instr.immediate < -(1 << 15))
+                {
+                    printf("error; line %d, col %d; integer literal does not fit into 16 bits\n", token->line, token->col);
+                    exit(1);
+                }
             }
             else if(instr.immediate > (1 << 16) - 1)
             {
@@ -660,7 +671,7 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
         }
         else if(type == TOK_BL)
         {
-            instr.opcode = 21;
+            instr.opcode = 23;
             ++token;
 
             instr.immediate = resolve_label(*token, labels);
@@ -670,7 +681,7 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
         }
         else if(type == TOK_BX)
         {
-            instr.opcode = 22;
+            instr.opcode = 24;
             ++token;
 
             instr.reg1 = token->reg_id;
