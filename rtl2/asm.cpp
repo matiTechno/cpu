@@ -3,9 +3,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-// todo:
-// mov, neg, push, pop pseudo-instructions; this will require a change in a label processing
-
 template<typename T>
 struct asm_array
 {

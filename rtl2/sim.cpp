@@ -16,21 +16,27 @@ int main(int argc, char** argv)
     top->clk = 0;
     top->reset = 1;
     int result = 666;
+    int time = 0;
 
-    for(int i = 0; i < 1000; ++i) // run for 1k cycles
+    for(;;)
     {
         top->eval();
 
-        if(top->dout_ready)
-            result = top->dout;
+        tfp->dump(time);
 
-        tfp->dump(i);
+        if(top->dout_ready)
+        {
+            result = top->dout;
+            break;
+        }
+
+        if(top->reset && top->clk)
+            top->reset = 0;
 
         top->clk = !top->clk;
-
-        if(i == 1)
-            top->reset = 0;
+        ++time;
     }
+
     printf("result: %d\n", result);
     tfp->close();
     delete top;
