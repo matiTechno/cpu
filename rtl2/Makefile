@@ -11,6 +11,9 @@ asm: asm.cpp
 
 clean:
 	rm -rf obj_dir
+	rm asm
+	rm a.hex
+	rm wave.vcd
 
 synth:
 	yosys synth.ys
