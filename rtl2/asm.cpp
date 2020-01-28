@@ -588,7 +588,7 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
 
             instr.reg1 = token->reg_id;
             consume_reg(token);
-            consume(token, TOK_PAREN_LEFT, "expected ')'");
+            consume(token, TOK_PAREN_RIGHT, "expected ')'");
         }
         else if(type >= TOK_ADDI && type <= TOK_SRAI)
         {

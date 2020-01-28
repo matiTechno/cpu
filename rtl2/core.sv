@@ -11,7 +11,8 @@
 module core(
     input clk,
     input reset,
-    output [31:0] dout
+    output [31:0] dout,
+    output dout_ready
     );
 
     wire [31:0] instr_addr, instr;
@@ -61,7 +62,9 @@ module core(
 
     pc pc(clk, reset, imm32, branch_en, instr_addr);
 
-    assign dout = alu_dout; // debug stuff
+    // IO, writes at address 0 are used to communicate with the outside world
+    assign dout = reg_dout2;
+    assign dout_ready = ~|alu_dout & we_ram;
 
 endmodule
 
@@ -207,6 +210,7 @@ module control_unit(
             13: begin // str
                 alu_opcode = `ALU_ADD;
                 sel_alu_rhs = 1;
+                we_ram = 1;
             end
             14: begin // addi
                 alu_opcode = `ALU_ADD;

@@ -13,16 +13,25 @@ int main(int argc, char** argv)
     top->trace(tfp, 99);
     tfp->open("wave.vcd");
 
-    top->clk = 1;
+    top->clk = 0;
+    top->reset = 1;
+    int result = 666;
 
     for(int i = 0; i < 1000; ++i) // run for 1k cycles
     {
-        top->reset = i < 1;
         top->eval();
+
+        if(top->dout_ready)
+            result = top->dout;
+
         tfp->dump(i);
+
         top->clk = !top->clk;
+
+        if(i == 1)
+            top->reset = 0;
     }
-    printf("result: %d\n", top->dout);
+    printf("result: %d\n", result);
     tfp->close();
     delete top;
     return 0;
