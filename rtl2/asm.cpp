@@ -583,6 +583,13 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
             consume_comma(token);
 
             instr.immediate = token->int_literal;
+
+            if(instr.immediate >= (1 << 15) || instr.immediate < -(1 << 15))
+            {
+                printf("error; line %d, col %d; integer literal does not fit into 16 bits\n", token->line, token->col);
+                exit(1);
+            }
+
             consume(token, TOK_INT_LITERAL, "expected an integer literal");
             consume(token, TOK_PAREN_LEFT, "expected '('");
 
@@ -604,6 +611,18 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
             consume_comma(token);
 
             instr.immediate = token->int_literal;
+
+            if(type == TOK_ADDI && ( instr.immediate >= (1 << 15) || instr.immediate < -(1 << 15) ))
+            {
+                printf("error; line %d, col %d; integer literal does not fit into 16 bits\n", token->line, token->col);
+                exit(1);
+            }
+            else if(instr.immediate > (1 << 16) - 1)
+            {
+                printf("error; line %d, col %d; bitmask literal does not fit into 16 bits\n", token->line, token->col);
+                exit(1);
+            }
+
             consume(token, TOK_INT_LITERAL, "expected an integer literal");
         }
         else
