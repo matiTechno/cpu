@@ -93,9 +93,13 @@ struct asm_array
 };
 
 #define ASM_ROM_SIZE 255
+
 #define ASM_LR 31
 #define ASM_SP 30
 #define ASM_FP 29
+
+#define ASM_S16 0
+#define ASM_U16 0
 
 enum asm_token_type
 {
@@ -276,7 +280,7 @@ struct asm_lexer
 
     char* pos()
     {
-        return source_it - 1;
+        return source_it;
     }
 
     char peek()
@@ -353,8 +357,8 @@ asm_token* lex(char* source)
     {
         lexer.token_line = lexer.line;
         lexer.token_col = lexer.col;
-        char c = lexer.advance();
         char* token_begin = lexer.pos();
+        char c = lexer.advance();
 
         switch(c)
         {
@@ -390,7 +394,7 @@ asm_token* lex(char* source)
                 while(!lexer.end() && digit_char(lexer.peek()))
                     lexer.advance();
 
-                int len = (lexer.pos() + 1) - token_begin;
+                int len = lexer.pos() - token_begin;
                 char buf[1024];
                 assert(len < sizeof(buf));
                 memcpy(buf, token_begin, len);
@@ -408,7 +412,7 @@ asm_token* lex(char* source)
                     lexer.advance();
 
                 char* id_begin = token_begin + 1;
-                int len = (lexer.pos() + 1) - id_begin;
+                int len = lexer.pos() - id_begin;
 
                 if(len)
                 {
@@ -436,7 +440,7 @@ asm_token* lex(char* source)
 
                 asm_str str;
                 str.data = token_begin;
-                str.len = (lexer.pos() + 1) - token_begin;
+                str.len = lexer.pos() - token_begin;
 
                 asm_token_type token_type = TOK_EOF;
 
@@ -523,28 +527,53 @@ asm_array<asm_label> collect_labels(asm_token* token)
     return labels;
 }
 
-void consume(asm_token*& token, asm_token_type type, const char* err_msg)
+asm_token consume(asm_token*& it, asm_token_type type, const char* err_msg)
 {
-    if(token->type != type)
+    if(it->type != type)
     {
-        printf("error; line %d, col %d; %s\n", token->line, token->col, err_msg);
+        printf("error; line %d, col %d; %s\n", it->line, it->col, err_msg);
         exit(1);
     }
-    ++token;
+    asm_token token = *it;
+    ++it;
+    return token;
 }
 
-void consume_reg(asm_token*& token)
+int consume_reg(asm_token*& it)
 {
-    consume(token, TOK_REG, "expected a register name");
+    return consume(it, TOK_REG, "expected a register name").reg_id;
 }
 
-void consume_comma(asm_token*& token)
+int consume_int_literal(asm_token*& it, int type)
 {
-    consume(token, TOK_COMMA, "expected ','");
+    asm_token token = consume(it, TOK_INT_LITERAL, "expected an integer literal");
+    bool error;
+
+    if(type == ASM_S16)
+        error = token.int_literal >= (1 << 15) || token.int_literal < -(1 << 15);
+    else
+    {
+        assert(type == ASM_U16);
+        error = token.int_literal > (1 << 16) - 1;
+    }
+
+    if(error)
+    {
+        printf("error; line %d, col %d; integer literal does not fit into 16 bits\n", token.line, token.col);
+        exit(1);
+    }
+    return token.int_literal;
 }
 
-int resolve_label(asm_token token, asm_array<asm_label> labels)
+void consume_comma(asm_token*& it)
 {
+    consume(it, TOK_COMMA, "expected ','");
+}
+
+int consume_label_identifier(asm_token*& it, asm_array<asm_label> labels)
+{
+    asm_token token = consume(it, TOK_IDENTIFIER, "expected a label identifier");
+
     for(asm_label label: labels)
     {
         if(asm_strcmp(token.identifier_str, label.str))
@@ -579,113 +608,65 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
             instr.opcode = 0;
             instr.rtype_opcode = type - TOK_ADD;
             ++token;
-
-            instr.reg3 = token->reg_id;
-            consume_reg(token);
+            instr.reg3 = consume_reg(token);
             consume_comma(token);
-
-            instr.reg1 = token->reg_id;
-            consume_reg(token);
+            instr.reg1 = consume_reg(token);
             consume_comma(token);
-
-            instr.reg2 = token->reg_id;
-            consume_reg(token);
+            instr.reg2 = consume_reg(token);
         }
         else if(type >= TOK_BEQ && type < TOK_B)
         {
             instr.opcode = 1 + (type - TOK_BEQ);
             ++token;
-
-            instr.reg1 = token->reg_id;
-            consume_reg(token);
+            instr.reg1 = consume_reg(token);
             consume_comma(token);
-
-            instr.reg2 = token->reg_id;
-            consume_reg(token);
+            instr.reg2 = consume_reg(token);
             consume_comma(token);
-
-            instr.immediate = resolve_label(*token, labels);
-            consume(token, TOK_IDENTIFIER, "expected a label identifier");
+            instr.immediate = consume_label_identifier(token, labels);
         }
         else if(type == TOK_B)
         {
             instr.opcode = 11;
             ++token;
-            instr.immediate = resolve_label(*token, labels);
-            consume(token, TOK_IDENTIFIER, "expected a label identifier");
+            instr.immediate = consume_label_identifier(token, labels);
         }
         else if(type == TOK_LDR || type == TOK_STR)
         {
             instr.opcode = 12 + (type - TOK_LDR);
             ++token;
-
-            instr.reg2 = token->reg_id;
-            consume_reg(token);
+            instr.reg2 = consume_reg(token);
             consume_comma(token);
-
-            instr.immediate = token->int_literal;
-
-            if(instr.immediate >= (1 << 15) || instr.immediate < -(1 << 15))
-            {
-                printf("error; line %d, col %d; integer literal does not fit into 16 bits\n", token->line, token->col);
-                exit(1);
-            }
-
-            consume(token, TOK_INT_LITERAL, "expected an integer literal");
+            instr.immediate = consume_int_literal(token, ASM_S16);
             consume(token, TOK_PAREN_LEFT, "expected '('");
-
-            instr.reg1 = token->reg_id;
-            consume_reg(token);
+            instr.reg1 = consume_reg(token);
             consume(token, TOK_PAREN_RIGHT, "expected ')'");
         }
         else if(type >= TOK_ADDI && type < TOK_BL)
         {
             instr.opcode = 14 + (type - TOK_ADDI);
             ++token;
-
-            instr.reg2 = token->reg_id;
-            consume_reg(token);
+            instr.reg2 = consume_reg(token);
             consume_comma(token);
-
-            instr.reg1 = token->reg_id;
-            consume_reg(token);
+            instr.reg1 = consume_reg(token);
             consume_comma(token);
-
-            instr.immediate = token->int_literal;
 
             if(type == TOK_ADDI || type == TOK_MULI || type == TOK_DIVI)
-            {
-                if(instr.immediate >= (1 << 15) || instr.immediate < -(1 << 15))
-                {
-                    printf("error; line %d, col %d; integer literal does not fit into 16 bits\n", token->line, token->col);
-                    exit(1);
-                }
-            }
-            else if(instr.immediate > (1 << 16) - 1)
-            {
-                printf("error; line %d, col %d; bitmask literal does not fit into 16 bits\n", token->line, token->col);
-                exit(1);
-            }
-
-            consume(token, TOK_INT_LITERAL, "expected an integer literal");
+                instr.immediate = consume_int_literal(token, ASM_S16);
+            else
+                instr.immediate = consume_int_literal(token, ASM_U16);
         }
         else if(type == TOK_BL)
         {
             instr.opcode = 23;
             ++token;
-
-            instr.immediate = resolve_label(*token, labels);
-            consume(token, TOK_IDENTIFIER, "expected a label identifier");
-
+            instr.immediate = consume_label_identifier(token, labels);
             instr.reg2 = ASM_LR;
         }
         else if(type == TOK_BX)
         {
             instr.opcode = 24;
             ++token;
-
-            instr.reg1 = token->reg_id;
-            consume_reg(token);
+            instr.reg1 = consume_reg(token);
         }
         else
         {
