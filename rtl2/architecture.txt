@@ -32,8 +32,12 @@ alu_opcode:
 6 - sll
 7 - srl
 8 - sra
-9 - mul    // note: mul and div currently support only signed arithmetic and store the result only in 32 bits
+9 - mul
 10 - div
+
+// note: mul and div currently support only signed arithmetic and store the result only in 32 bits;
+// they take 33 cycles to execute, all other instructions take 1 cycle
+
 
 i-type instructions (by opcode):
 

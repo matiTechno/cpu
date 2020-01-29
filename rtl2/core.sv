@@ -17,25 +17,58 @@ module core(
     output dout_ready
     );
 
-    wire [31:0] instr_addr, instr, pc_next;
+    // outputs
 
-    rom rom(instr_addr, instr);
+    // rom
+    wire [31:0] instr;
 
+    // decoder
     wire [5:0] opcode, rtype_opcode;
     wire [4:0] reg1, reg2, reg3;
     wire [15:0] imm16;
 
-    instr_decoder instr_decoder(instr, opcode, rtype_opcode, reg1, reg2, reg3, imm16);
-
+    //control unit
     wire [5:0] alu_opcode;
-    wire sel_reg_write, sel_alu_rhs, sel_branch_addr, we_reg, we_ram, sign_extend_imm, beq, bne, blt, bltu, bgt, bgtu;
     wire [1:0] sel_reg_din;
+    wire sel_reg_write, sel_alu_rhs, sel_branch_addr, we_reg, we_ram, sign_extend_imm, beq, bne, blt, bltu, bgt, bgtu;
+    wire update_pc, reset_alu;
 
-    control_unit control_unit(opcode, rtype_opcode, alu_opcode, sel_reg_write, sel_reg_din, sel_alu_rhs, sel_branch_addr, we_reg, we_ram, sign_extend_imm,
-        beq, bne, blt, bltu, bgt, bgtu);
+    // register file
+    wire [31:0] reg_dout1, reg_dout2;
 
-    wire [31:0] ram_dout, alu_dout;
+    // alu
+    wire [31:0] alu_dout;
+    wire borrow;
+
+    // ram
+    wire [31:0] ram_dout;
+
+    // branch unit
+    wire branch_en;
+
+
+
+    // additional inputs, state
+
+    reg [31:0] pc;
+    wire [31:0] pc_inc1, pc_next;
     reg [31:0] reg_din;
+    wire [4:0] reg_write = sel_reg_write ? reg3 : reg2;
+    wire [31:0] imm32 = sign_extend_imm ? { {16{imm16[15]}}, imm16} : { {16{1'b0}}, imm16};
+    wire [31:0] alu_din_rhs = sel_alu_rhs ? imm32 : reg_dout2;
+    wire [31:0] branch_addr = sel_branch_addr ? reg_dout1 : imm32;
+
+
+
+    // additional logic
+
+    // IO, writes at the address 0 are used to communicate with the outside world
+    assign dout = reg_dout2;
+    assign dout_ready = ~|alu_dout & we_ram;
+
+    add32 add32(pc, 32'd1, pc_inc1);
+
+    assign pc_next = update_pc ? (branch_en ? branch_addr : pc_inc1) : pc;
 
     always_comb begin
         if(sel_reg_din == 0)
@@ -43,33 +76,31 @@ module core(
         else if(sel_reg_din == 1)
             reg_din = ram_dout;
         else
-            reg_din = pc_next;
+            reg_din = pc_inc1;
     end
 
-    wire [4:0] reg_write = sel_reg_write ? reg3 : reg2;
-    wire [31:0] reg_dout1, reg_dout2;
+    always_ff @(posedge clk) begin
+        pc <= reset ? 32'd0 : pc_next;
+    end
+
+
+
+    // modules
+
+    rom rom(pc, instr);
+
+    instr_decoder instr_decoder(instr, opcode, rtype_opcode, reg1, reg2, reg3, imm16);
+
+    control_unit control_unit(clk, reset, opcode, rtype_opcode, alu_opcode, sel_reg_din, sel_reg_write, sel_alu_rhs,
+        sel_branch_addr, we_reg, we_ram, sign_extend_imm, beq, bne, blt, bltu, bgt, bgtu, update_pc, reset_alu);
 
     register_file register_file(clk, reg_din, we_reg, reg_write, reg1, reg2, reg_dout1, reg_dout2);
 
-    wire [31:0] imm32 = sign_extend_imm ? { {16{imm16[15]}}, imm16} : { {16{1'b0}}, imm16};
-    wire [31:0] alu_din_rhs = sel_alu_rhs ? imm32 : reg_dout2;
-    wire carry, borrow;
-
-    alu alu(alu_opcode, reg_dout1, alu_din_rhs, alu_dout, carry, borrow);
+    alu alu(clk, reset_alu, alu_opcode, reg_dout1, alu_din_rhs, alu_dout, borrow);
 
     ram ram(clk, alu_dout, reg_dout2, we_ram, ram_dout);
 
-    wire branch_en;
-
     branch_unit branch_unit(~|alu_dout, borrow, reg_dout1[31], alu_din_rhs[31], beq, bne, blt, bltu, bgt, bgtu, branch_en);
-
-    wire [31:0] branch_addr = sel_branch_addr ? reg_dout1 : imm32;
-
-    pc pc(clk, reset, branch_addr, branch_en, instr_addr, pc_next);
-
-    // IO, writes at address 0 are used to communicate with the outside world
-    assign dout = reg_dout2;
-    assign dout_ready = ~|alu_dout & we_ram;
 
 endmodule
 
@@ -120,11 +151,13 @@ module instr_decoder(
 endmodule
 
 module control_unit(
+    input clk,
+    input reset,
     input [5:0] opcode,
     input [5:0] rtype_opcode,
     output reg [5:0] alu_opcode,
-    output reg sel_reg_write,
     output reg [1:0] sel_reg_din,
+    output reg sel_reg_write,
     output reg sel_alu_rhs,
     output reg sel_branch_addr,
     output reg we_reg,
@@ -135,13 +168,24 @@ module control_unit(
     output reg blt,
     output reg bltu,
     output reg bgt,
-    output reg bgtu
+    output reg bgtu,
+    output reg update_pc,
+    output reg reset_alu
     );
+
+    reg [5:0] counter;
+
+    always_ff @(posedge clk) begin
+        if(reset)
+            counter <= 0;
+        else
+            counter <= update_pc ? 0 : counter + 1;
+    end
 
     always_comb begin
         alu_opcode = 0;
-        sel_reg_write = 0;
         sel_reg_din = 0;
+        sel_reg_write = 0;
         sel_alu_rhs = 0;
         sel_branch_addr = 0;
         we_reg = 0;
@@ -153,12 +197,23 @@ module control_unit(
         bltu = 0;
         bgt = 0;
         bgtu = 0;
+        update_pc = 1;
+        reset_alu = 0;
 
         case(opcode)
             0: begin // r-tytpe
                 alu_opcode = rtype_opcode;
                 sel_reg_write = 1;
-                we_reg = 1;
+
+                if( (rtype_opcode == `ALU_MUL) | (rtype_opcode == `ALU_DIV) ) begin
+                    if(counter == 32)
+                        we_reg = 1;
+                    else begin
+                        update_pc = 0;
+                        reset_alu = ~|counter;
+                    end
+                end else
+                    we_reg = 1;
             end
 
             // i-type
@@ -262,14 +317,26 @@ module control_unit(
             21: begin // muli
                 alu_opcode = `ALU_MUL;
                 sel_alu_rhs = 1;
-                we_reg = 1;
                 sign_extend_imm = 1;
+
+                if(counter == 32)
+                    we_reg = 1;
+                else begin
+                    update_pc = 0;
+                    reset_alu = ~|counter;
+                end
             end
             22: begin // divi
                 alu_opcode = `ALU_DIV;
                 sel_alu_rhs = 1;
-                we_reg = 1;
                 sign_extend_imm = 1;
+
+                if(counter == 32)
+                    we_reg = 1;
+                else begin
+                    update_pc = 0;
+                    reset_alu = ~|counter;
+                end
             end
             23: begin // bl
                 sel_reg_din = 2;
@@ -283,27 +350,6 @@ module control_unit(
                 bne = 1;
             end
         endcase
-    end
-
-endmodule
-
-module pc(
-    input clk,
-    input reset,
-    input [31:0] din,
-    input branch_en,
-    output reg [31:0] count,
-    output wire [31:0] next
-    );
-
-    wire carry;
-    add32 add32(count, 32'd1, next, carry);
-
-    always_ff @(posedge clk) begin
-        if(reset)
-            count <= 32'd0;
-        else
-            count <= branch_en ? din : next;
     end
 
 endmodule
@@ -333,11 +379,12 @@ module register_file(
 endmodule
 
 module alu(
+    input clk,
+    input reset,
     input [5:0] opcode,
     input [31:0] din_lhs,
     input [31:0] din_rhs,
     output reg [31:0] dout,
-    output carry,
     output borrow
     );
 
@@ -345,14 +392,12 @@ module alu(
     wire [4:0] shift_count = din_rhs[4:0];
     wire [31:0] srl; // shift right logical
     
-    add32 add32(din_lhs, din_rhs, sum, carry);
+    add32 add32(din_lhs, din_rhs, sum);
     sub32 sub32(din_lhs, din_rhs, diff, borrow);
-    mul32 mul32(din_lhs, din_rhs, mul);
+    mul32 mul32(clk, reset, din_lhs, din_rhs, mul);
     assign srl = din_lhs >> shift_count;
 
     always_comb begin
-        dout = 0;
-
         case(opcode)
             `ALU_ADD: dout = sum;
             `ALU_SUB: dout = diff;
@@ -366,6 +411,7 @@ module alu(
             `ALU_SRA: dout = {din_lhs[31], srl[30:0]}; // shift right arithmetic
             `ALU_MUL: dout = mul;
             `ALU_DIV: dout = mul; // todo
+            default:  dout = 0;
         endcase
     end
 
@@ -404,51 +450,49 @@ module ram(
 endmodule
 
 module mul32(
+    input clk,
+    input reset,
     input [31:0] a,
     input [31:0] b,
     output [31:0] product
     );
 
-    reg [31:0] part32 [31:0];
-    wire [31:0] part16 [15:0];
-    wire [31:0] part8 [7:0];
-    wire [31:0] part4 [3:0];
-    wire [31:0] part2 [1:0];
+    reg sign;
+    reg [31:0] sum, ra, rb;
+    wire [31:0] a_neg, b_neg, sum_next, sum_next_neg;
 
-    always_comb begin
-        int i;
-        for(i = 0; i < 32; i = i + 1)
-            part32[i] = (a & {32{b[i]}}) << i;
+    add32 add1(~a, 1, a_neg);
+    add32 add2(~b, 1, b_neg);
+    add32 add3(sum, ra & {32{rb[0]}}, sum_next);
+    add32 add4(~sum_next, 1, sum_next_neg);
+
+    assign product = sign ? sum_next_neg : sum_next;
+
+    always_ff @(posedge clk) begin
+        if(reset) begin
+            sign <= a[31] ^ b[31];
+            ra <= a[31] ? a_neg : a;
+            rb <= b[31] ? b_neg : b;
+            sum <= 0;
+        end else begin
+            ra <= ra << 1;
+            rb <= rb >> 1;
+            sum <= sum_next;
+        end
     end
-
-    genvar i;
-    generate
-        for(i = 0; i < 32; i = i + 2)
-            add32 add32(part32[i], part32[i + 1], part16[i / 2]);
-        for(i = 0; i < 16; i = i + 2)
-            add32 add32(part16[i], part16[i + 1], part8[i / 2]);
-        for(i = 0; i < 8; i = i + 2)
-            add32 add32(part8[i], part8[i + 1], part4[i / 2]);
-        for(i = 0; i < 4; i = i + 2)
-            add32 add32(part4[i], part4[i + 1], part2[i / 2]);
-    endgenerate
-
-    add32 add32(part2[0], part2[1], product);
 
 endmodule
 
-// todo, add32 and sub32 could be merged into a one module
+// todo, add32 and sub32 could be merged into a one module; currently input/output carries are not needed
 module add32(
     input [31:0] a,
     input [31:0] b,
-    output [31:0] sum,
-    output cout
+    output [31:0] sum
     );
 
     wire [32:0] carry;
 
     assign carry[0] = 0;
-    assign cout = carry[32];
 
     genvar i;
     generate

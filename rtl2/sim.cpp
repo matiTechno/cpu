@@ -17,24 +17,25 @@ int main(int argc, char** argv)
     top->reset = 1;
     int result = 666;
     int time = 0;
+    int exit_count = -1;
 
-    for(;;)
+    while(exit_count != 0)
     {
         top->eval();
-
         tfp->dump(time);
-
-        if(top->dout_ready)
-        {
-            result = top->dout;
-            break;
-        }
 
         if(top->reset && top->clk)
             top->reset = 0;
 
+        if(top->dout_ready && !top->clk)
+        {
+            result = top->dout;
+            exit_count = 100;
+        }
+
         top->clk = !top->clk;
         ++time;
+        --exit_count;
     }
 
     printf("result: %d\n", result);
