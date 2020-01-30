@@ -66,7 +66,7 @@ module core(
     assign dout = reg_dout2;
     assign dout_ready = ~|alu_dout & we_ram;
 
-    add32 add32(pc, 32'd1, pc_inc1);
+    adder #(32) adder_pc(pc, 1, pc_inc1);
 
     assign pc_next = update_pc ? (branch_en ? branch_addr : pc_inc1) : pc;
 
@@ -80,7 +80,7 @@ module core(
     end
 
     always_ff @(posedge clk) begin
-        pc <= reset ? 32'd0 : pc_next;
+        pc <= reset ? 0 : pc_next;
     end
 
 
@@ -174,12 +174,15 @@ module control_unit(
     );
 
     reg [5:0] counter;
+    wire [5:0] counter_inc1;
+
+    adder #(6) adder(counter, 1, counter_inc1);
 
     always_ff @(posedge clk) begin
         if(reset)
             counter <= 0;
         else
-            counter <= update_pc ? 0 : counter + 1;
+            counter <= update_pc ? 0 : counter_inc1;
     end
 
     always_comb begin
@@ -366,7 +369,7 @@ module register_file(
     );
 
     reg [31:0] reg_array[31:1];
-    wire [31:0] r0 = 32'd0;
+    wire [31:0] r0 = 0;
 
     assign dout1 = |reg_read1 ? reg_array[reg_read1] : r0;
     assign dout2 = |reg_read2 ? reg_array[reg_read2] : r0;
@@ -388,14 +391,13 @@ module alu(
     output borrow
     );
 
-    reg [31:0] sum, diff, mul;
+    wire [31:0] sum, diff, product, quotient;
     wire [4:0] shift_count = din_rhs[4:0];
-    wire [31:0] srl; // shift right logical
     
-    add32 add32(din_lhs, din_rhs, sum);
-    sub32 sub32(din_lhs, din_rhs, diff, borrow);
-    mul32 mul32(clk, reset, din_lhs, din_rhs, mul);
-    assign srl = din_lhs >> shift_count;
+    adder #(32) adder(din_lhs, din_rhs, sum);
+    subtractor #(32) subtractor(din_lhs, din_rhs, diff, borrow);
+    multiplier #(32) multiplier(clk, reset, din_lhs, din_rhs, product);
+    divider #(32) divider(clk, reset, din_lhs, din_rhs, quotient);
 
     always_comb begin
         case(opcode)
@@ -407,10 +409,10 @@ module alu(
             `ALU_NOR: dout = ~(din_lhs | din_rhs);
             // todo, use own shifter modules
             `ALU_SLL: dout = din_lhs << shift_count;
-            `ALU_SRL: dout = srl;
-            `ALU_SRA: dout = {din_lhs[31], srl[30:0]}; // shift right arithmetic
-            `ALU_MUL: dout = mul;
-            `ALU_DIV: dout = mul; // todo
+            `ALU_SRL: dout = din_lhs >> shift_count;
+            `ALU_SRA: dout = din_lhs >>> shift_count;
+            `ALU_MUL: dout = product;
+            `ALU_DIV: dout = quotient;
             default:  dout = 0;
         endcase
     end
@@ -449,30 +451,78 @@ module ram(
 
 endmodule
 
-module mul32(
+// todo, adder and subtractor could possibly be merged into a one module, same
+// for multiplier and divider
+
+module divider #(parameter N)(
     input clk,
     input reset,
-    input [31:0] a,
-    input [31:0] b,
-    output [31:0] product
+    input [N-1:0] a,
+    input [N-1:0] b,
+    output [N-1:0] quotient
     );
 
     reg sign;
-    reg [31:0] sum, ra, rb;
-    wire [31:0] a_neg, b_neg, sum_next, sum_next_neg;
+    wire [N-1:0] a_neg, b_neg, result_next, result_next_neg;
+    reg [N-1:0] result;
+    reg [2*N-1:0] reminder, divisor, diff;
+    wire borrow;
 
-    add32 add1(~a, 1, a_neg);
-    add32 add2(~b, 1, b_neg);
-    add32 add3(sum, ra & {32{rb[0]}}, sum_next);
-    add32 add4(~sum_next, 1, sum_next_neg);
+    adder #(N) adder1(~a, 1, a_neg);
+    adder #(N) adder2(~b, 1, b_neg);
+    adder #(N) adder3(~result_next, 1, result_next_neg);
+
+    assign quotient = sign ? result_next_neg : result_next;
+
+    subtractor #(2*N) subtractor1(reminder, divisor, diff, borrow);
+
+    assign result_next = borrow ? (result << 1) : (result << 1) | 1;
+
+
+    always_ff @(posedge clk) begin
+        if(reset) begin
+            sign <= a[N-1] ^ b[N-1];
+
+            reminder[2*N-1:N] <= 0;
+            reminder[N-1:0]   <= a[N-1] ? a_neg : a;
+
+            divisor [2*N-1]     <= 0;
+            divisor [2*N-2:N-1] <= b[N-1] ? b_neg : b;
+            divisor [N-2:0]     <= 0;
+
+        end else begin
+            divisor <= divisor >> 1;
+            result <= result_next;
+            reminder <= borrow ? reminder : diff;
+        end
+    end
+
+endmodule
+
+module multiplier #(parameter N)(
+    input clk,
+    input reset,
+    input [N-1:0] a,
+    input [N-1:0] b,
+    output [N-1:0] product
+    );
+
+    reg sign;
+    reg [N-1:0] sum, ra, rb;
+    wire [N-1:0] a_neg, b_neg, sum_next, sum_next_neg;
+
+    adder #(N) adder1(~a, 1, a_neg);
+    adder #(N) adder2(~b, 1, b_neg);
+    adder #(N) adder3(sum, ra & {N{rb[0]}}, sum_next);
+    adder #(N) adder4(~sum_next, 1, sum_next_neg);
 
     assign product = sign ? sum_next_neg : sum_next;
 
     always_ff @(posedge clk) begin
         if(reset) begin
-            sign <= a[31] ^ b[31];
-            ra <= a[31] ? a_neg : a;
-            rb <= b[31] ? b_neg : b;
+            sign <= a[N-1] ^ b[N-1];
+            ra <= a[N-1] ? a_neg : a;
+            rb <= b[N-1] ? b_neg : b;
             sum <= 0;
         end else begin
             ra <= ra << 1;
@@ -483,46 +533,45 @@ module mul32(
 
 endmodule
 
-// todo, add32 and sub32 could be merged into a one module; currently input/output carries are not needed
-module add32(
-    input [31:0] a,
-    input [31:0] b,
-    output [31:0] sum
+module adder #(parameter N)(
+    input [N-1:0] a,
+    input [N-1:0] b,
+    output [N-1:0] sum
     );
 
-    wire [32:0] carry;
+    wire [N:0] carry;
 
     assign carry[0] = 0;
 
     genvar i;
     generate
-        for(i = 0; i < 32; i = i + 1)
-            add1 add1(a[i], b[i], carry[i], sum[i], carry[i + 1]);
+        for(i = 0; i < N; i = i + 1)
+            full_adder full_adder(a[i], b[i], carry[i], sum[i], carry[i + 1]);
     endgenerate
 
 endmodule
 
-module sub32(
-    input [31:0] a,
-    input [31:0] b,
-    output [31:0] diff,
+module subtractor #(parameter N)(
+    input [N-1:0] a,
+    input [N-1:0] b,
+    output [N-1:0] diff,
     output bout
     );
 
-    wire [32:0] borrow;
+    wire [N:0] borrow;
 
     assign borrow[0] = 0;
-    assign bout = borrow[32];
+    assign bout = borrow[N];
 
     genvar i;
     generate
-        for(i = 0; i < 32; i = i + 1)
-            sub1 sub1(a[i], b[i], borrow[i], diff[i], borrow[i + 1]);
+        for(i = 0; i < N; i = i + 1)
+            full_subtractor full_subtractor(a[i], b[i], borrow[i], diff[i], borrow[i + 1]);
     endgenerate
 
 endmodule
 
-module add1(
+module full_adder(
     input a,
     input b,
     input cin,
@@ -535,7 +584,7 @@ module add1(
 
 endmodule
 
-module sub1(
+module full_subtractor(
     input a,
     input b,
     input bin, // borrow
