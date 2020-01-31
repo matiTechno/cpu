@@ -472,7 +472,7 @@ ic_token* lex(char* source)
 
                 int len = lexer.pos() - lexer.token_begin;
                 char buf[1024];
-                assert(len < sizeof(buf));
+                assert(len < (int)sizeof(buf));
                 memcpy(buf, lexer.token_begin, len);
                 buf[len] = '\0';
 
@@ -660,12 +660,72 @@ ic_expr* produce_expr();
 
 ic_expr* produce_expr_primary()
 {
+    switch(parser.peek())
+    {
+    case TOK_INT_LITERAL:
+    case TOK_FLOAT_LITERAL:
+        return alloc_expr(EXPR_PRIMARY, parser.advance());
+    case TOK_IDENTIFIER:
+        if(parser.peek2() == TOK_LEFT_PAREN)
+        {
+            ic_expr* expr = alloc_expr(EXPR_CALL, parser.advance());
+            parser.consume(TOK_LEFT_PAREN);
+            ic_expr** arg_tail = &expr->next;
 
+            while(!parser.try_consume(TOK_RIGHT_PAREN))
+            {
+                if(*arg_tail)
+                    parser.consume(TOK_COMMA);
+                *arg_tail = produce_expr();
+                arg_tail = &(**arg_tail).next;
+            }
+            return expr;
+        }
+        else
+            return alloc_expr(EXPR_PRIMARY, parser.advance());
+    case TOK_LEFT_PAREN:
+    {
+        ic_expr* expr = alloc_expr(EXPR_PARENS, parser.advance());
+        expr->sub_expr = produce_expr();
+        parser.consume(TOK_RIGHT_PAREN);
+        return expr;
+    }
+    default:
+        ic_exit(parser.peek_full().line, parser.peek_full().col, "expected a primary expression");
+        return nullptr;
+    }
 }
 
 ic_expr* produce_expr_access()
 {
+     ic_expr* lhs = produce_expr_primary();
 
+     for(;;)
+     {
+         switch(parser.peek())
+         {
+         case TOK_LEFT_BRACKET:
+         {
+             ic_expr* expr = alloc_expr(EXPR_SUBSCRIPT, parser.advance());
+             expr->subscript.lhs = lhs;
+             expr->subscript.rhs = produce_expr();
+             parser.consume(TOK_RIGHT_BRACKET);
+             lhs = expr;
+             break;
+         }
+         case TOK_DOT:
+         case TOK_ARROW:
+         {
+             ic_expr* expr = alloc_expr(EXPR_MEMBER_ACCESS, parser.advance());
+             expr->member_access.lhs = lhs;
+             expr->member_access.rhs_token = parser.consume(TOK_IDENTIFIER);
+             lhs = expr;
+             break;
+         }
+         default:
+             return lhs;
+         }
+     }
 }
 
 ic_expr* produce_expr_unary()
@@ -749,7 +809,7 @@ ic_expr* produce_expr_binary(ic_precedence precedence)
         break;
     case PREC_MULTIPLY:
         token_types[0] = TOK_STAR;
-        token_types[0] = TOK_SLASH;
+        token_types[1] = TOK_SLASH;
         break;
     case PREC_UNARY:
         return produce_expr_unary();
@@ -842,7 +902,7 @@ ic_stmt* produce_stmt(bool push_scope = true)
         while(!parser.try_consume(TOK_RIGHT_BRACE))
         {
             *tail = produce_stmt();
-            tail = &(*tail)->next;
+            tail = &(**tail).next;
         }
         return stmt;
     }
@@ -942,6 +1002,7 @@ ic_function produce_function()
         ic_param param;
         param.type = produce_type();
         param.id_token = parser.consume(TOK_IDENTIFIER);
+        params.push_back(param);
     }
 
     fun.params_size = params.size;
