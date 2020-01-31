@@ -1,5 +1,6 @@
 wave.vcd
 asm
+ic
 obj_dir
 *.swp
 *.hex

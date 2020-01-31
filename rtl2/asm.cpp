@@ -2,95 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
-
-template<typename T>
-struct asm_array
-{
-    int size;
-    int capacity;
-    T* buf;
-
-    void init()
-    {
-        size = 0;
-        capacity = 0;
-        buf = nullptr;
-        // give it a start
-        resize(20);
-        size = 0;
-    }
-
-    T* transfer()
-    {
-        T* temp = buf;
-        buf = nullptr;
-        return temp;
-    }
-
-    void free()
-    {
-        ::free(buf);
-    }
-
-    void clear()
-    {
-        size = 0;
-    }
-
-    void resize(int new_size)
-    {
-        size = new_size;
-        _maybe_grow();
-    }
-
-    void push_back()
-    {
-        size += 1;
-        _maybe_grow();
-    }
-
-    void push_back(T t)
-    {
-        size += 1;
-        _maybe_grow();
-        back() = t;
-    }
-
-    void pop_back()
-    {
-        size -= 1;
-    }
-
-    T& back()
-    {
-        return *(buf + size - 1);
-    }
-
-    T* begin()
-    {
-        return buf;
-    }
-
-    T* end()
-    {
-        return buf + size;
-    }
-
-    T& operator[](int i)
-    {
-        return buf[i];
-    }
-
-    void _maybe_grow()
-    {
-        if (size > capacity)
-        {
-            capacity = size * 2;
-            buf = (T*)realloc(buf, capacity * sizeof(T));
-            assert(buf);
-        }
-    }
-};
+#include "array.h"
 
 #define ASM_ROM_SIZE 255
 
@@ -251,7 +163,7 @@ struct asm_instr
 
 struct asm_lexer
 {
-    asm_array<asm_token> tokens;
+    array<asm_token> tokens;
     int line;
     int col;
     int token_line;
@@ -503,10 +415,10 @@ asm_token* lex(char* source)
 
 // error checking is deffered to generate_code()
 
-asm_array<asm_label> collect_labels(asm_token* token)
+array<asm_label> collect_labels(asm_token* token)
 {
     int addr = 0;
-    asm_array<asm_label> labels;
+    array<asm_label> labels;
     labels.init();
 
     while(token->type != TOK_EOF)
@@ -570,7 +482,7 @@ void consume_comma(asm_token*& it)
     consume(it, TOK_COMMA, "expected ','");
 }
 
-int consume_label_identifier(asm_token*& it, asm_array<asm_label> labels)
+int consume_label_identifier(asm_token*& it, array<asm_label> labels)
 {
     asm_token token = consume(it, TOK_IDENTIFIER, "expected a label identifier");
 
@@ -586,9 +498,9 @@ int consume_label_identifier(asm_token*& it, asm_array<asm_label> labels)
 
 // read architecture.txt for more information on instruction encoding
 
-asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> labels)
+array<unsigned int> generate_code(asm_token* token, array<asm_label> labels)
 {
-    asm_array<asm_instr> instructions;
+    array<asm_instr> instructions;
     instructions.init();
 
     while(token->type != TOK_EOF)
@@ -678,7 +590,7 @@ asm_array<unsigned int> generate_code(asm_token* token, asm_array<asm_label> lab
     }
 
     assert(sizeof(unsigned int) == 4);
-    asm_array<unsigned int> code;
+    array<unsigned int> code;
     code.init();
 
     for(asm_instr instr: instructions)
@@ -726,8 +638,8 @@ int main(int argc, const char** argv)
     fclose(file);
     file_data[file_size] = '\0';
     asm_token* tokens = lex(file_data);
-    asm_array<asm_label> labels = collect_labels(tokens);
-    asm_array<unsigned int> code = generate_code(tokens, labels);
+    array<asm_label> labels = collect_labels(tokens);
+    array<unsigned int> code = generate_code(tokens, labels);
 
     if(code.size > ASM_ROM_SIZE) // rom size
     {
