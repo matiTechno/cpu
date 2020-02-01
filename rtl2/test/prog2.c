@@ -11,6 +11,7 @@ struct rayt
     vec3t direction;
 };
 
+
 int add(int x, int y)
 {
     return x + y;
