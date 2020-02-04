@@ -18,9 +18,13 @@ enum ic_token_type
     TOK_CONTINUE,
     TOK_INT,
     TOK_FLOAT,
+    TOK_BOOL,
     TOK_VOID,
     TOK_STRUCT,
     TOK_SIZEOF,
+    TOK_TRUE,
+    TOK_FALSE,
+    TOK_NULLPTR,
 
     TOK_INT_LITERAL,
     TOK_FLOAT_LITERAL,
@@ -60,20 +64,21 @@ enum ic_token_type
     TOK_VBAR_VBAR,
 };
 
-struct ic_keyword
-{
-    const char* str;
-    ic_token_type token_type;
-};
-
+// order matters
 enum ic_basic_type
 {
     TYPE_INT,
+    TYPE_BOOL,
     TYPE_FLOAT,
     TYPE_VOID,
+    TYPE_NULLPTR,
     TYPE_STRUCT,
 };
 
+// todo, branch_loop_begin, branch_loop_end, branch_begin, branch_end
+//  some way to flatten the for / if nodes before code gen
+// flatten push / pop scope?
+// load expression
 enum ic_stmt_type
 {
     STMT_COMPOUND,
@@ -88,15 +93,42 @@ enum ic_stmt_type
 
 enum ic_expr_type
 {
-    EXPR_BINARY,
-    EXPR_UNARY,
+    EXPR_ASSIGN,
+    EXPR_LOGICAL_OR,
+    EXPR_LOGICAL_AND,
+    EXPR_CMP_EQ,
+    EXPR_CMP_NEQ,
+    EXPR_CMP_GT,
+    EXPR_CMP_GE,
+    EXPR_CMP_LT,
+    EXPR_CMP_LE,
+    EXPR_ADD,
+    EXPR_SUB,
+    EXPR_MUL,
+    EXPR_DIV,
+    EXPR_LOGICAL_NOT,
+    EXPR_ADDR,
+    EXPR_DEREF,
     EXPR_SIZEOF,
-    EXPR_CAST,
-    EXPR_SUBSCRIPT,
-    EXPR_MEMBER_ACCESS,
-    EXPR_PARENS,
     EXPR_CALL,
-    EXPR_PRIMARY,
+    EXPR_INT_LITERAL,
+    EXPR_FLOAT_LITERAL,
+    EXPR_VAR_ID,
+    EXPR_NULLPTR,
+    EXPR_CAST,
+    EXPR_MEMBER_ACCESS,
+
+    // todo, resolve in the sema pass
+    EXPR_ADD_ASSIGN,
+    EXPR_SUB_ASSIGN,
+    EXPR_MUL_ASSIGN,
+    EXPR_DIV_ASSIGN,
+    EXPR_DEREF_MEMBER_ACCESS,
+    EXPR_IDENTIFIER,
+    EXPR_SUBSCRIPT,
+    EXPR_INC,
+    EXPR_DEC,
+    EXPR_NEG, // 0 - x;
 };
 
 struct ic_str
@@ -124,8 +156,8 @@ struct ic_struct;
 struct ic_type
 {
     ic_basic_type basic_type;
-    int struct_id;
     int indirection;
+    int struct_id;
 };
 
 struct ic_expr;
@@ -187,7 +219,7 @@ struct ic_expr
         struct
         {
             ic_type type;
-            ic_expr* expr;
+            ic_expr* sub_expr;
         } cast;
 
         struct
@@ -199,12 +231,22 @@ struct ic_expr
         struct
         {
             ic_expr* lhs;
+            int member_id; // sema
             ic_token rhs_token;
         } member_access;
-    };
 
-    ic_expr* sub_expr;
-    ic_type sizeof_type;
+        struct
+        {
+            int fun_id; // sema
+            ic_expr* args;
+        } call;
+
+        ic_expr* sub_expr;
+        ic_type sizeof_type;
+        int int_literal;
+        float float_literal;
+        int var_id; // sema
+    };
 };
 
 struct ic_param
@@ -236,3 +278,17 @@ bool ic_strcmp(ic_str lhs, ic_str rhs);
 ic_token* lex(char* source);
 
 void parse(ic_token* _tokens, array<ic_function>& functions, array<ic_struct>& structures);
+
+void sema(array<ic_function> functions, array<ic_struct> structures);
+
+void gen_llvm(array<ic_function> functions, array<ic_struct> structures);
+
+inline bool is_void_type(ic_type type)
+{
+    return type.basic_type == TYPE_VOID && !type.indirection;
+}
+
+inline ic_type get_basic_type(ic_basic_type basic_type)
+{
+    return {basic_type, 0, 0};
+}

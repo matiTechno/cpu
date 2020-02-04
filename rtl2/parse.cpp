@@ -86,6 +86,7 @@ bool peek_type()
     {
     case TOK_INT:
     case TOK_FLOAT:
+    case TOK_BOOL:
         return true;
     case TOK_VOID:
         return parser.peek2() == TOK_STAR;
@@ -107,6 +108,7 @@ ic_type produce_type()
     ic_token token = parser.advance();
     ic_type type;
     type.indirection = 0;
+    type.struct_id = 0;
 
     switch(token.type)
     {
@@ -115,6 +117,9 @@ ic_type produce_type()
         break;
     case TOK_FLOAT:
         type.basic_type = TYPE_FLOAT;
+        break;
+    case TOK_BOOL:
+        type.basic_type = TYPE_BOOL;
         break;
     case TOK_VOID:
         type.basic_type = TYPE_VOID;
@@ -147,30 +152,53 @@ ic_expr* produce_expr_primary()
     switch(parser.peek())
     {
     case TOK_INT_LITERAL:
+    {
+        ic_expr* expr = alloc_expr(EXPR_INT_LITERAL, parser.peek_full());
+        expr->int_literal = parser.advance().int_literal;
+        return expr;
+    }
     case TOK_FLOAT_LITERAL:
-        return alloc_expr(EXPR_PRIMARY, parser.advance());
+    {
+        ic_expr* expr = alloc_expr(EXPR_FLOAT_LITERAL, parser.peek_full());
+        expr->float_literal = parser.advance().float_literal;
+        return expr;
+    }
+    case TOK_TRUE:
+    case TOK_FALSE:
+    {
+        ic_expr* expr = alloc_expr(EXPR_INT_LITERAL, parser.peek_full());
+        expr->int_literal = parser.advance().type == TOK_TRUE;
+        return expr;
+    }
+    case TOK_NULLPTR:
+        return alloc_expr(EXPR_NULLPTR, parser.advance());
+
     case TOK_IDENTIFIER:
         if(parser.peek2() == TOK_LEFT_PAREN)
         {
             ic_expr* expr = alloc_expr(EXPR_CALL, parser.advance());
             parser.consume(TOK_LEFT_PAREN);
-            ic_expr** arg_tail = &expr->next;
+            ic_expr** arg_tail = &expr->call.args;
 
             while(!parser.try_consume(TOK_RIGHT_PAREN))
             {
-                if(*arg_tail)
-                    parser.consume(TOK_COMMA);
                 *arg_tail = produce_expr();
                 arg_tail = &(**arg_tail).next;
+
+                if(!parser.try_consume(TOK_COMMA))
+                {
+                    parser.consume(TOK_RIGHT_PAREN);
+                    break;
+                }
             }
             return expr;
         }
         else
-            return alloc_expr(EXPR_PRIMARY, parser.advance());
+            return alloc_expr(EXPR_IDENTIFIER, parser.advance());
     case TOK_LEFT_PAREN:
     {
-        ic_expr* expr = alloc_expr(EXPR_PARENS, parser.advance());
-        expr->sub_expr = produce_expr();
+        parser.advance();
+        ic_expr* expr = produce_expr();
         parser.consume(TOK_RIGHT_PAREN);
         return expr;
     }
@@ -200,7 +228,8 @@ ic_expr* produce_expr_access()
          case TOK_DOT:
          case TOK_ARROW:
          {
-             ic_expr* expr = alloc_expr(EXPR_MEMBER_ACCESS, parser.advance());
+             ic_expr_type type = parser.peek() == TOK_DOT ? EXPR_MEMBER_ACCESS : EXPR_DEREF_MEMBER_ACCESS;
+             ic_expr* expr = alloc_expr(type, parser.advance());
              expr->member_access.lhs = lhs;
              expr->member_access.rhs_token = parser.consume(TOK_IDENTIFIER);
              lhs = expr;
@@ -214,31 +243,40 @@ ic_expr* produce_expr_access()
 
 ic_expr* produce_expr_unary()
 {
+    ic_expr_type type;
+
     switch(parser.peek())
     {
     case TOK_BANG:
+        type = EXPR_LOGICAL_NOT;
+        break;
     case TOK_MINUS:
+        type = EXPR_NEG;
+        break;
     case TOK_PLUS_PLUS:
+        type = EXPR_INC;
+        break;
     case TOK_MINUS_MINUS:
+        type = EXPR_DEC;
+        break;
     case TOK_AMP:
+        type = EXPR_ADDR;
+        break;
     case TOK_STAR:
-    {
-        ic_expr* expr = alloc_expr(EXPR_UNARY, parser.advance());
-        expr->sub_expr = produce_expr_unary();
-        return expr;
-    }
+        type = EXPR_DEREF;
+        break;
     case TOK_LEFT_PAREN:
     {
-        ic_expr* expr = alloc_expr(EXPR_CALL, parser.advance());
+        ic_expr* expr = alloc_expr(EXPR_CAST, parser.advance());
 
         if(!peek_type())
         {
             --parser.token_it; // hack, there is no peek2_type()
-            break;
+            return produce_expr_access();
         }
         expr->cast.type = produce_type();
         parser.consume(TOK_RIGHT_PAREN);
-        expr->cast.expr = produce_expr_unary();
+        expr->cast.sub_expr = produce_expr_unary();
         return expr;
     }
     case TOK_SIZEOF:
@@ -249,8 +287,12 @@ ic_expr* produce_expr_unary()
         parser.consume(TOK_RIGHT_PAREN);
         return expr;
     }
+    default:
+        return produce_expr_access();
     }
-    return produce_expr_access();
+    ic_expr* expr = alloc_expr(type, parser.advance());
+    expr->sub_expr = produce_expr_unary();
+    return expr;
 }
 
 enum ic_precedence
@@ -267,33 +309,46 @@ enum ic_precedence
 ic_expr* produce_expr_binary(ic_precedence precedence)
 {
     ic_token_type token_types[5] = {}; // note, initialize all to TOK_EOF
+    ic_expr_type expr_types[5] = {};
     assert(TOK_EOF == 0);
 
     switch(precedence)
     {
     case PREC_LOGICAL_OR:
         token_types[0] = TOK_VBAR_VBAR;
+        expr_types[0] = EXPR_LOGICAL_OR;
         break;
     case PREC_LOGICAL_AND:
         token_types[0] = TOK_AMP_AMP;
+        expr_types[0] = EXPR_LOGICAL_AND;
         break;
     case PREC_COMPARE_EQUAL:
         token_types[0] = TOK_EQUAL_EQUAL;
         token_types[1] = TOK_BANG_EQUAL;
+        expr_types[0] = EXPR_CMP_EQ;
+        expr_types[1] = EXPR_CMP_NEQ;
         break;
     case PREC_COMPARE_GREATER:
         token_types[0] = TOK_GREATER;
         token_types[1] = TOK_GREATER_EQUAL;
         token_types[2] = TOK_LESS;
         token_types[3] = TOK_LESS_EQUAL;
+        expr_types[0] = EXPR_CMP_GT;
+        expr_types[1] = EXPR_CMP_GE;
+        expr_types[2] = EXPR_CMP_LT;
+        expr_types[3] = EXPR_CMP_LE;
         break;
     case PREC_ADD:
         token_types[0] = TOK_PLUS;
         token_types[1] = TOK_MINUS;
+        expr_types[0] = EXPR_ADD;
+        expr_types[1] = EXPR_SUB;
         break;
     case PREC_MULTIPLY:
         token_types[0] = TOK_STAR;
         token_types[1] = TOK_SLASH;
+        expr_types[0] = EXPR_MUL;
+        expr_types[1] = EXPR_DIV;
         break;
     case PREC_UNARY:
         return produce_expr_unary();
@@ -304,18 +359,20 @@ ic_expr* produce_expr_binary(ic_precedence precedence)
     for(;;)
     {
         ic_token_type* it = token_types;
+        ic_expr_type* eit = expr_types;
 
         while(*it != TOK_EOF)
         {
             if(*it == parser.peek())
                 break;
             ++it;
+            ++eit;
         }
 
         if(*it == TOK_EOF)
             break;
 
-        ic_expr* expr = alloc_expr(EXPR_BINARY, parser.advance());
+        ic_expr* expr = alloc_expr(*eit, parser.advance());
         expr->binary.lhs = lhs;
         expr->binary.rhs = produce_expr_binary((ic_precedence)(precedence + 1));
         lhs = expr;
@@ -326,25 +383,55 @@ ic_expr* produce_expr_binary(ic_precedence precedence)
 ic_expr* produce_expr_assignment()
 {
     ic_expr* lhs = produce_expr_binary(PREC_LOGICAL_OR);
+    ic_expr_type type;
 
     switch(parser.peek())
     {
     case TOK_EQUAL:
+        type = EXPR_ASSIGN;
+        break;
     case TOK_PLUS_EQUAL:
+        type = EXPR_ADD_ASSIGN;
+        break;
     case TOK_MINUS_EQUAL:
+        type = EXPR_SUB_ASSIGN;
+        break;
     case TOK_STAR_EQUAL:
+        type = EXPR_MUL_ASSIGN;
+        break;
     case TOK_SLASH_EQUAL:
-        ic_expr* expr = alloc_expr(EXPR_BINARY, parser.advance());
-        expr->binary.lhs = lhs;
-        expr->binary.rhs = produce_expr();
-        return expr;
+        type = EXPR_DIV_ASSIGN;
+        break;
+    default:
+        return lhs;
     }
-    return lhs;
+    ic_expr* expr = alloc_expr(type, parser.advance());
+    expr->binary.lhs = lhs;
+    expr->binary.rhs = produce_expr();
+    return expr;
 }
 
 ic_expr* produce_expr()
 {
     return produce_expr_assignment();
+}
+
+ic_expr* produce_expr_condition()
+{
+    bool in_parens = parser.peek() == TOK_LEFT_PAREN;
+    ic_expr* expr = produce_expr();
+
+    switch(expr->type)
+    {
+    case EXPR_ASSIGN:
+    case EXPR_ADD_ASSIGN:
+    case EXPR_SUB_ASSIGN:
+    case EXPR_MUL_ASSIGN:
+    case EXPR_DIV_ASSIGN:
+        if(!in_parens)
+            ic_exit(expr->token.line, expr->token.col, "condition can't be an assignment");
+    }
+    return expr;
 }
 
 ic_stmt* produce_stmt_var_decl()
@@ -394,7 +481,7 @@ ic_stmt* produce_stmt(bool push_scope = true)
     {
         ic_stmt* stmt = alloc_stmt(STMT_FOR, parser.advance());
         parser.consume(TOK_LEFT_PAREN);
-        stmt->_for.header2 = produce_expr();
+        stmt->_for.header2 = produce_expr_condition();
         parser.consume(TOK_RIGHT_PAREN);
         stmt->_for.body = produce_stmt(IC_SAME_SCOPE);
         return stmt;
@@ -407,12 +494,8 @@ ic_stmt* produce_stmt(bool push_scope = true)
 
         if(!parser.try_consume(TOK_SEMICOLON))
         {
-            stmt->_for.header2 = produce_expr();
+            stmt->_for.header2 = produce_expr_condition();
             parser.consume(TOK_SEMICOLON);
-            ic_token token = stmt->_for.header2->token;
-
-            if(token.type == TOK_EQUAL)
-                ic_exit(token.line, token.col, "condition can't be an assignment");
         }
         if(!parser.try_consume(TOK_RIGHT_PAREN))
             stmt->_for.header3 = produce_expr();
@@ -424,12 +507,7 @@ ic_stmt* produce_stmt(bool push_scope = true)
     {
         ic_stmt* stmt = alloc_stmt(STMT_IF, parser.advance());
         parser.consume(TOK_LEFT_PAREN);
-        stmt->_if.header = produce_expr();
-        {
-            ic_token token = stmt->_if.header->token;
-            if(token.type == TOK_EQUAL)
-                ic_exit(token.line, token.col, "condition can't be an assignment");
-        }
+        stmt->_if.header = produce_expr_condition();
         parser.consume(TOK_RIGHT_PAREN);
         stmt->_if.body_if = produce_stmt();
 
@@ -440,8 +518,12 @@ ic_stmt* produce_stmt(bool push_scope = true)
     case TOK_RETURN:
     {
         ic_stmt* stmt = alloc_stmt(STMT_RETURN, parser.advance());
-        stmt->expr = produce_expr();
-        parser.consume(TOK_SEMICOLON);
+
+        if(!parser.try_consume(TOK_SEMICOLON))
+        {
+            stmt->expr = produce_expr();
+            parser.consume(TOK_SEMICOLON);
+        }
         return stmt;
     }
     case TOK_BREAK:
@@ -456,8 +538,9 @@ ic_stmt* produce_stmt(bool push_scope = true)
         parser.consume(TOK_SEMICOLON);
         return stmt;
     }
-    } // switch
-    return produce_stmt_var_decl();
+    default:
+        return produce_stmt_var_decl();
+    }
 }
 
 ic_function produce_function()

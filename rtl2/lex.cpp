@@ -1,5 +1,11 @@
 #include "ic.h"
 
+struct ic_keyword
+{
+    const char* str;
+    ic_token_type token_type;
+};
+
 static ic_keyword _keywords[] = {
     "for",      TOK_FOR,
     "while",    TOK_WHILE,
@@ -10,9 +16,13 @@ static ic_keyword _keywords[] = {
     "continue", TOK_CONTINUE,
     "int",      TOK_INT,
     "float",    TOK_FLOAT,
+    "bool",     TOK_BOOL,
     "void",     TOK_VOID,
     "struct",   TOK_STRUCT,
     "sizeof",   TOK_SIZEOF,
+    "true",     TOK_TRUE,
+    "false",    TOK_FALSE,
+    "nullptr",  TOK_NULLPTR,
 };
 
 struct ic_lexer
@@ -106,14 +116,14 @@ struct ic_lexer
     }
 };
 
-bool digit_char(char c)
+bool is_digit_char(char c)
 {
     return c >= '0' && c <= '9';
 }
 
-bool identifier_char(char c)
+bool is_identifier_char(char c)
 {
-    return digit_char(c) || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+    return is_digit_char(c) || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
 ic_token* lex(char* source)
@@ -199,18 +209,18 @@ ic_token* lex(char* source)
                 lexer.add_token(lexer.try_consume('=') ? TOK_SLASH_EQUAL : TOK_SLASH);
             break;
         default:
-            if(digit_char(c))
+            if(is_digit_char(c))
             {
                 ic_token token;
                 token.type = TOK_INT_LITERAL;
 
-                while(!lexer.end() && digit_char(lexer.peek()))
+                while(!lexer.end() && is_digit_char(lexer.peek()))
                     lexer.advance();
 
                 if(lexer.try_consume('.'))
                     token.type = TOK_FLOAT_LITERAL;
 
-                while(!lexer.end() && digit_char(lexer.peek()))
+                while(!lexer.end() && is_digit_char(lexer.peek()))
                     lexer.advance();
 
                 int len = lexer.pos() - lexer.token_begin;
@@ -226,9 +236,9 @@ ic_token* lex(char* source)
 
                 lexer.add_token(token);
             }
-            else if(identifier_char(c))
+            else if(is_identifier_char(c))
             {
-                while(!lexer.end() && identifier_char(lexer.peek()))
+                while(!lexer.end() && is_identifier_char(lexer.peek()))
                     lexer.advance();
 
                 ic_token token;

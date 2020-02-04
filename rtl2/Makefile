@@ -7,10 +7,11 @@ obj_dir: sim.cpp core.sv
 asm: asm.cpp
 	g++ -g -Wall -Wextra asm.cpp -o asm -Wno-missing-field-initializers -Wno-switch
 
-ic: ic.cpp
-	g++ -fno-exceptions -fno-rtti -g -Wall -Wextra ic.cpp lex.cpp parse.cpp -o ic -Wno-switch
+.PHONY: ic clean synth
 
-.PHONY: clean synth
+ic: ic.cpp lex.cpp parse.cpp sema.cpp gen_llvm.cpp
+	g++ -fno-exceptions -fno-rtti -g -Wall -Wextra ic.cpp lex.cpp parse.cpp sema.cpp gen_llvm.cpp -o ic -Wno-switch -I$(shell llvm-config --includedir --ldflags --libs)
+
 
 clean:
 	rm -rf obj_dir
