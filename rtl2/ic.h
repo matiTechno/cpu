@@ -283,6 +283,8 @@ void sema(array<ic_function> functions, array<ic_struct> structures);
 
 void gen_llvm(array<ic_function> functions, array<ic_struct> structures);
 
+void gen_mycore(array<ic_function> functions, array<ic_struct> structures);
+
 inline bool is_void_type(ic_type type)
 {
     return type.basic_type == TYPE_VOID && !type.indirection;

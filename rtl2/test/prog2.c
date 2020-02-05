@@ -35,19 +35,35 @@
 //    // implicit endless loop
 //}
 
-int add(int a, int b)
-{
-    return a + b;
-}
 
-int mul(int a, int b)
-{
-    return a * b;
-}
 
-int main()
+
+//int add(int a, int b)
+//{
+//    return a + b;
+//}
+
+//int mul(int a, int b)
+//{
+//    return a * b;
+//}
+
+//int main()
+//{
+//    int x = 4;
+//    x = x + add(x, 3);
+//    return mul(x, 6);
+//}
+
+
+
+void main()
 {
-    int x = 4;
-    x = x + add(x, 3);
-    return mul(x, 6);
+    int a = 3;
+    int b = 5;
+    int x = a * b;
+    int y = x * b;
+    int z = (x + y) * 9;
+    x = z + 3;
+    int ret = (x * z * y) / a;
 }

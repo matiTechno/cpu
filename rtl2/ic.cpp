@@ -64,6 +64,7 @@ int main(int argc, const char** argv)
     parse(tokens, functions, structures);
     assert(structures.size <= IC_MAX_STRUCT); // pointers to structures data must not be invalidated, see ic_type
     sema(functions, structures);
-    gen_llvm(functions, structures);
+    //gen_llvm(functions, structures);
+    gen_mycore(functions, structures);
     return 0;
 }
