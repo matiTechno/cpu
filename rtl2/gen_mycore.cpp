@@ -504,7 +504,7 @@ ic_pid assign_reg(ic_frame& frame, ic_vid vid)
 
 void gen_function(ic_function& fun, array<ic_ir_instr> code)
 {
-    printf("__%.*s:\n", fun.id_token.str.len, fun.id_token.str.data);
+    printf("\n__%.*s:\n", fun.id_token.str.len, fun.id_token.str.data);
     print_asm("addi sp, sp, -1");
     print_asm("str fp, 0(sp)");
     print_asm("add fp, sp, r0");
@@ -589,10 +589,10 @@ void gen_function(ic_function& fun, array<ic_ir_instr> code)
             break;
         case IR_RETURN:
             print_asm("add r1, r0, r%d", src1);
-            print_asm("b __end__%.*s\n", fun.id_token.str.len, fun.id_token.str.data);
+            print_asm("b __end__%.*s", fun.id_token.str.len, fun.id_token.str.data);
             break;
         case IR_RETURN_VOID:
-            print_asm("b __end__%.*s\n", fun.id_token.str.len, fun.id_token.str.data);
+            print_asm("b __end__%.*s", fun.id_token.str.len, fun.id_token.str.data);
             break;
         case IR_ARG:
         {
