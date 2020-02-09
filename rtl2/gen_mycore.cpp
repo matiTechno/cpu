@@ -596,26 +596,32 @@ void gen_function(ic_function& fun, array<ic_ir_instr> code)
             break;
         case IR_ARG:
         {
-            ic_pid pid = instr.arg_id + 1;
-
             // first four arguments are passed in the registers, rest on the stack
             if(instr.arg_id < 4)
             {
+                ic_pid dst_pid = instr.arg_id + 1;
 
-                if(!is_unused(frame.reg_file[pid]))
-                    spill_reg(frame, pid);
-                print_asm("add r%d, r0, r%d", pid, src1);
+                if(!is_unused(frame.reg_file[dst_pid]))
+                    spill_reg(frame, dst_pid);
+                print_asm("add r%d, r0, r%d", dst_pid, src1);
             }
             else
             {
-                int idx = frame.memory.size;
+                static int idx; // I don't like this, this is so arguments on a stack do not overwrite each other
 
-                for(int i = idx - 1; i >= 0; --i)
+                if(instr.arg_id == 4)
                 {
-                    if(!is_unused(frame.memory[i]))
-                        break;
-                    idx = i;
+                    idx = frame.memory.size;
+
+                    for(int i = idx - 1; i >= 0; --i)
+                    {
+                        if(!is_unused(frame.memory[i]))
+                            break;
+                        idx = i;
+                    }
                 }
+                else
+                    idx += 1;
 
                 if(idx == frame.memory.size)
                 {
@@ -624,7 +630,7 @@ void gen_function(ic_function& fun, array<ic_ir_instr> code)
                 }
 
                 int offset = frame.fp_offset - idx;
-                print_asm("ldr r%d, %d(fp)", pid, offset);
+                print_asm("str r%d, %d(fp)", src1, offset);
             }
             break;
         }
