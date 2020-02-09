@@ -262,6 +262,7 @@ struct ic_function
     ic_param* params;
     int params_size;
     ic_stmt* body;
+    bool leaf; // sema
 };
 
 struct ic_struct

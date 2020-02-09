@@ -1,69 +1,21 @@
-//struct vec3t
-//{
-//    float x;
-//    float y;
-//    float z;
-//};
-
-//struct rayt
-//{
-//    vec3t origin;
-//    vec3t direction;
-//};
-
-
-//int add(int x, int y)
-//{
-//    return x + y;
-//}
-
-//float dot(vec3t a, vec3t b)
-//{
-//    return a.x * b.x + a.y * b.y + a.z * b.z;
-//}
-
-//void main()
-//{
-//    // implicit initialization of stack pointer, __malloc() data, etc.
-
-//    int x;
-//    if((x = 3))
-//        return;
-
-//    //__send(1);
-
-//    // implicit endless loop
-//}
-
-
-
-
-//int add(int a, int b)
-//{
-//    return a + b;
-//}
-
-//int mul(int a, int b)
-//{
-//    return a * b;
-//}
-
-//int main()
-//{
-//    int x = 4;
-//    x = x + add(x, 3);
-//    return mul(x, 6);
-//}
-
-
-
-void main()
+int mul(int a, int b)
 {
-    int a = 3;
-    int b = 5;
-    int x = a * b;
-    int y = x * b;
-    int z = (x + y) * 9;
-    x = z + 3;
-    int ret = (x * z * y) / a;
+    return a * b;
+}
+
+int add(int a, int b)
+{
+    return a + b;
+}
+
+int div(int a, int b)
+{
+    return a / b;
+}
+
+int main()
+{
+    int x = mul(5, 4);
+    int y = div(x, 2);
+    return add(add(x, y), 3);
 }

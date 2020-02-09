@@ -34,6 +34,7 @@ struct
     array<ic_scope> scopes;
     int loop_count;
     ic_type return_type;
+    bool leaf;
 
     void push_scope()
     {
@@ -350,6 +351,7 @@ ic_expr_result resolve_expr(ic_expr* expr)
 
     case EXPR_CALL:
     {
+        ctx.leaf = false;
         ic_token token = expr->token;
         ic_function* fun = ctx.get_function(token.str);
 
@@ -577,9 +579,10 @@ ic_stmt_result resolve_stmt(ic_stmt* stmt)
     }
 }
 
-void resolve_function(ic_function function)
+void resolve_function(ic_function& function)
 {
     ctx.return_type = function.return_type;
+    ctx.leaf = true;
     ctx.push_scope();
 
     for(int i = 0; i < function.params_size; ++i)
@@ -594,6 +597,7 @@ void resolve_function(ic_function function)
         ic_exit(function.id_token.line, function.id_token.col, "return statement missing");
 
     ctx.pop_scope();
+    function.leaf = ctx.leaf;
 }
 
 void sema(array<ic_function> functions, array<ic_struct> structures)

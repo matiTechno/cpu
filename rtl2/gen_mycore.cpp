@@ -1,33 +1,35 @@
-#include "ic.h"
 #include <stdio.h>
+#include <stdarg.h>
+#include "ic.h"
 
-struct ic_reg
+typedef int ic_vid; // virtual register id
+
+enum ic_ir_instr_type
 {
-    int id;
-
-    bool operator==(ic_reg rhs)
-    {
-        return id == rhs.id;
-    }
+    IR_ASSIGN,
+    IR_ADD,
+    IR_SUB,
+    IR_MUL,
+    IR_DIV,
+    IR_INT_LITERAL,
+    IR_CALL,
+    IR_RETURN,
+    IR_RETURN_VOID,
+    IR_ARG,
 };
 
-enum ic_instr_type
-{
-    I_ASSIGN,
-    I_ADD,
-    I_SUB,
-    I_MUL,
-    I_DIV,
-    I_INT_LITERAL,
-};
+// three-address code
 
-struct ic_instr
+struct ic_ir_instr
 {
-    ic_instr_type type;
-    ic_reg dst;
-    ic_reg src1;
-    ic_reg src2;
-    int int_literal;
+    ic_ir_instr_type type;
+    ic_vid dst;
+    ic_vid src1;
+    ic_vid src2;
+    int imm;
+    int arg_id;
+    ic_str fun_name;
+    ic_vid call_ret_vid;
 };
 
 struct ic_scope
@@ -37,10 +39,10 @@ struct ic_scope
 
 struct
 {
-    array<ic_reg> vars;
-    array<ic_instr> instructions;
     array<ic_scope> scopes;
-    int regs_size;
+    array<ic_vid> vars;
+    array<ic_ir_instr> code;
+    int next_vid;
 
     void push_scope()
     {
@@ -54,118 +56,153 @@ struct
         scopes.pop_back();
     }
 
-    void add_var()
+    void add_var(ic_vid vid)
     {
-        vars.push_back(alloc_reg());
+        assert(scopes.size);
+        vars.push_back(vid);
     }
 
-    ic_reg build_add(ic_reg a, ic_reg b)
+    // for return void set vid to 0
+    void build_return(ic_vid vid)
     {
-        return build_binary(I_ADD, a, b);
+        ic_ir_instr instr = {};
+        instr.type = vid ? IR_RETURN : IR_RETURN_VOID;
+        instr.src1 = vid;
+        code.push_back(instr);
     }
 
-    ic_reg build_sub(ic_reg a, ic_reg b)
+    ic_vid build_call(ic_str fun_name)
     {
-        return build_binary(I_SUB, a, b);
+        ic_ir_instr instr = {};
+        instr.type = IR_CALL;
+        instr.fun_name = fun_name;
+        instr.call_ret_vid = alloc_vid();
+        code.push_back(instr);
+        return instr.call_ret_vid;
     }
 
-    ic_reg build_mul(ic_reg a, ic_reg b)
+    void build_arg(ic_vid src, int arg_id)
     {
-        return build_binary(I_MUL, a, b);
+        ic_ir_instr instr = {};
+        instr.type = IR_ARG;
+        instr.src1 = src;
+        instr.arg_id = arg_id;
+        code.push_back(instr);
     }
 
-    ic_reg build_div(ic_reg a, ic_reg b)
+    ic_vid build_assign(ic_vid dst, ic_vid src)
     {
-        return build_binary(I_DIV, a, b);
-    }
-
-    void build_assign(ic_reg dst, ic_reg src)
-    {
-        ic_instr instr;
-        instr.type = I_ASSIGN;
+        ic_ir_instr instr = {}; // this is important, zero out vids
+        instr.type = IR_ASSIGN;
         instr.dst = dst;
         instr.src1 = src;
-        instr.src2.id = -1;
-        instructions.push_back(instr);
-    }
-
-
-    ic_reg build_int_literal(int val)
-    {
-        ic_reg dst = alloc_reg();
-        ic_instr instr;
-        instr.type = I_INT_LITERAL;
-        instr.dst = dst;
-        instr.int_literal = val;
-        instr.src1.id = -1;
-        instr.src2.id = -1;
-        instructions.push_back(instr);
+        code.push_back(instr);
         return dst;
     }
 
-    // internal
-
-    ic_reg build_binary(ic_instr_type type, ic_reg lhs, ic_reg rhs)
+    ic_vid build_add(ic_vid a, ic_vid b)
     {
-        ic_reg dst = alloc_reg();
-        ic_instr instr;
+        return build_binary(IR_ADD, a, b);
+    }
+
+    ic_vid build_sub(ic_vid a, ic_vid b)
+    {
+        return build_binary(IR_SUB, a, b);
+    }
+
+    ic_vid build_mul(ic_vid a, ic_vid b)
+    {
+        return build_binary(IR_MUL, a, b);
+    }
+
+    ic_vid build_div(ic_vid a, ic_vid b)
+    {
+        return build_binary(IR_DIV, a, b);
+    }
+
+    ic_vid build_int_literal(int val)
+    {
+        ic_ir_instr instr = {};
+        instr.type = IR_INT_LITERAL;
+        instr.dst = alloc_vid();
+        instr.imm = val;
+        code.push_back(instr);
+        return instr.dst;
+    }
+
+    ic_vid build_binary(ic_ir_instr_type type, ic_vid lhs, ic_vid rhs)
+    {
+        ic_ir_instr instr = {};
         instr.type = type;
-        instr.dst = dst;
+        instr.dst = alloc_vid();
         instr.src1 = lhs;
         instr.src2 = rhs;
-        instructions.push_back(instr);
-        return dst;
+        code.push_back(instr);
+        return instr.dst;
     }
 
-    ic_reg alloc_reg()
+    ic_vid alloc_vid()
     {
-        ic_reg reg = {regs_size};
-        ++regs_size;
-        return reg;
+        ic_vid vid = next_vid;
+        ++next_vid;
+        return vid;
     }
 } ctx;
 
-ic_reg build_expr(ic_expr* expr)
+ic_vid build_expr(ic_expr* expr)
 {
     assert(expr);
 
     switch(expr->type)
     {
+    case EXPR_ASSIGN:
+    {
+        ic_vid lhs = build_expr(expr->binary.lhs);
+        ic_vid rhs = build_expr(expr->binary.rhs);
+        return ctx.build_assign(lhs, rhs);
+    }
     case EXPR_ADD:
     {
-        ic_reg lhs = build_expr(expr->binary.lhs);
-        ic_reg rhs = build_expr(expr->binary.rhs);
+        ic_vid lhs = build_expr(expr->binary.lhs);
+        ic_vid rhs = build_expr(expr->binary.rhs);
         return ctx.build_add(lhs, rhs);
     }
     case EXPR_SUB:
     {
-        ic_reg lhs = build_expr(expr->binary.lhs);
-        ic_reg rhs = build_expr(expr->binary.rhs);
+        ic_vid lhs = build_expr(expr->binary.lhs);
+        ic_vid rhs = build_expr(expr->binary.rhs);
         return ctx.build_sub(lhs, rhs);
     }
     case EXPR_MUL:
     {
-        ic_reg lhs = build_expr(expr->binary.lhs);
-        ic_reg rhs = build_expr(expr->binary.rhs);
+        ic_vid lhs = build_expr(expr->binary.lhs);
+        ic_vid rhs = build_expr(expr->binary.rhs);
         return ctx.build_mul(lhs, rhs);
     }
     case EXPR_DIV:
     {
-        ic_reg lhs = build_expr(expr->binary.lhs);
-        ic_reg rhs = build_expr(expr->binary.rhs);
+        ic_vid lhs = build_expr(expr->binary.lhs);
+        ic_vid rhs = build_expr(expr->binary.rhs);
         return ctx.build_div(lhs, rhs);
+    }
+    case EXPR_CALL:
+    {
+        ic_expr* it = expr->call.args;
+        int arg_id = 0;
+
+        while(it)
+        {
+            ic_vid vid = build_expr(it);
+            ctx.build_arg(vid, arg_id);
+            it = it->next;
+            ++arg_id;
+        }
+        return ctx.build_call(expr->token.str);
     }
     case EXPR_INT_LITERAL:
         return ctx.build_int_literal(expr->int_literal);
     case EXPR_VAR_ID:
         return ctx.vars[expr->var_id];
-    case EXPR_ASSIGN:
-    {
-        ic_reg lhs = build_expr(expr->binary.lhs);
-        ic_reg rhs = build_expr(expr->binary.rhs);
-        ctx.build_assign(lhs, rhs);
-        return lhs;
-    }
     default:
         assert(false);
         return {};
@@ -200,14 +237,28 @@ void build_stmt(ic_stmt* stmt)
         return;
     case STMT_VAR_DECL:
     {
-        ctx.add_var();
-
         if(stmt->var_decl.init_expr)
         {
-            ic_reg dst = ctx.vars.back();
-            ic_reg src = build_expr(stmt->var_decl.init_expr);
-            ctx.build_assign(dst, src);
+            ic_vid vid = build_expr(stmt->var_decl.init_expr);
+            ctx.add_var(vid);
         }
+        else
+        {
+            ic_vid vid = ctx.alloc_vid();
+            ctx.add_var(vid);
+            ctx.build_assign(vid, 0);
+        }
+        return;
+    }
+    case STMT_RETURN:
+    {
+        if(stmt->expr)
+        {
+            ic_vid vid = build_expr(stmt->expr);
+            ctx.build_return(vid);
+        }
+        else
+            ctx.build_return(0);
         return;
     }
     default:
@@ -215,195 +266,423 @@ void build_stmt(ic_stmt* stmt)
     }
 }
 
-#define IC_REGS_SIZE 3
-#define IC_MAX_DELAY 1000000
+// normal reg assignment range
+// r0 is never assigned
+// [r1:r4] are assigned only for arguments just before a call
+// r29, r30, r31 are special registers: fp, sp, lr
+#define RA_BEGIN 5
+#define RA_END 29
 
-struct
+// reg read reange
+#define RR_BEGIN 1
+#define RR_END 29
+
+#define MAX_DELAY 1000000
+
+// register file size
+#define RF_SIZE 32
+
+void print_asm(const char* fmt, ...)
 {
-    ic_reg regs[IC_REGS_SIZE];
-    array<ic_reg> mem;
+    printf("    ");
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+    printf("\n");
+}
 
-    int allocate_reg(bool ld, ic_reg new_reg, ic_instr* begin, ic_instr* end)
-    {
-        if(new_reg.id == -1)
-            return {};
+typedef int ic_pid; // physical register id
 
-        for(ic_reg& reg: regs)
-        {
-            // already loaded
-            if(reg == new_reg)
-                return &reg - regs;
-        }
-
-        for(ic_reg& reg: regs)
-        {
-            // take an unused register
-            if(reg.id == -1)
-            {
-                assert(!ld); // if there are unused register it means that register to load was not spilled yet, and must be alrady loaded
-                reg = new_reg;
-                return &reg - regs;
-            }
-        }
-
-        // spill a register with the longest use delay
-        int delays[IC_REGS_SIZE];
-
-        for(int& delay: delays)
-            delay = IC_MAX_DELAY;
-
-        for(ic_instr* it = begin; it != end; ++it)
-        {
-            ic_instr instr = *it;
-            int delay = it - begin;
-
-            for(ic_reg& reg: regs)
-            {
-                if(reg == instr.dst || reg == instr.src1 || reg == instr.src2)
-                {
-                    int id = &reg - regs;
-                    if(delays[id] > delay)
-                        delays[id] = delay;
-                }
-            }
-        }
-
-        int id_spill;
-        int max_delay = delays[0];
-
-        for(int& delay: delays)
-        {
-            if(delay >= max_delay)
-            {
-                id_spill = &delay - delays;
-                max_delay = delay;
-            }
-        }
-
-        // no need to spill, register data will never be used again and can be discarded
-        if(max_delay == IC_MAX_DELAY)
-        {
-            if(ld)
-                load(id_spill, new_reg);
-            regs[id_spill] = new_reg;
-            return id_spill;
-        }
-
-        // find an unused memory or push sp
-        bool done = false;
-
-        for(ic_reg& cell: mem)
-        {
-            if(cell.id == -1)
-            {
-                done = true;
-                cell = regs[id_spill];
-                emit_store(id_spill, &cell - mem.begin());
-                break;
-            }
-        }
-
-        if(!done)
-        {
-            int cell_id = mem.size;
-            mem.push_back(regs[id_spill]);
-            emit_push_sp();
-            emit_store(id_spill, cell_id);
-
-        }
-        if(ld)
-            load(id_spill, new_reg);
-
-        regs[id_spill] = new_reg;
-        return id_spill;
-    }
-
-    void load(int reg_id, ic_reg reg)
-    {
-        int mem_id = -1;
-
-        for(ic_reg& cell: mem)
-        {
-            if(cell == reg)
-            {
-                cell.id = -1;
-                mem_id = &cell - mem.begin();
-                break;
-            }
-        }
-        assert(mem_id != -1);
-        printf("    ldr r%d, %d(fp)\n", reg_id + 1, -mem_id - 1); // + 1 - r0 is hardwired to 0
-    }
-
-    void emit_push_sp()
-    {
-        printf("    addi sp, r0, -1\n");
-    }
-
-    void emit_store(int reg_idx, int mem_idx)
-    {
-        printf("    str r%d, %d(fp)\n", reg_idx + 1, -mem_idx - 1);
-    }
-} hw;
-
-void generate_asm(array<ic_instr> instructions)
+struct ic_reg
 {
-    hw.mem.init();
+    ic_vid vid;
+    bool saved;
+    ic_pid pid; // only used fore restoring saved registers
+};
 
-    for(ic_reg& reg: hw.regs)
-        reg.id = -1;
+struct ic_frame
+{
+    ic_reg reg_file[RF_SIZE];
+    array<ic_reg> memory;
+    int fp_offset;
+    ic_ir_instr* ip;
+    ic_ir_instr* iend;
+};
 
-    printf("    addi fp, r0, 255\n");
-    printf("    addi sp, r0, 255\n");
+void remove_unused_vids(ic_frame& frame, ic_reg* regs, int regs_size)
+{
+    array<int> delays;
+    delays.init();
+    delays.resize(regs_size);
 
-    int last_dst;
+    for(int& i: delays)
+        i = MAX_DELAY;
 
-    for(ic_instr& instr: instructions)
+    for(ic_ir_instr* it = frame.ip; it != frame.iend; ++it)
     {
-        // r0 is hardwired to 0
-        int dst = 1 + hw.allocate_reg(false, instr.dst, &instr, instructions.end());
-        int src1 = 1 + hw.allocate_reg(true, instr.src1, &instr, instructions.end());
-        int src2 = 1 + hw.allocate_reg(true, instr.src2, &instr, instructions.end());
+        for(int i = 0; i < regs_size; ++i)
+        {
+            ic_reg& reg = regs[i];
 
-        last_dst = dst;
+            if(reg.vid == it->src1 || reg.vid == it->src2) // we don't check dst vid, because it discards previous data
+            {
+                int delay = it - frame.ip;
+
+                if(delay < delays[i])
+                    delays[i] = delay;
+            }
+        }
+    }
+
+    for(int i = 0; i < regs_size; ++i)
+    {
+        if(delays[i] == MAX_DELAY)
+            regs[i].vid = 0;
+    }
+}
+
+ic_pid find_spill_target(ic_frame& frame)
+{
+    array<int> delays;
+    delays.init();
+    delays.resize(RF_SIZE);
+
+    for(int& i: delays)
+        i = MAX_DELAY;
+
+    for(ic_ir_instr* it = frame.ip; it != frame.iend; ++it)
+    {
+        for(int i = RA_BEGIN; i < RA_END; ++i)
+        {
+            ic_reg& reg = frame.reg_file[i];
+
+            if(reg.saved)
+                continue;
+
+            if(reg.vid == it->src1 || reg.vid == it->src2) // we don't check dst vid, because it discards previous data
+            {
+                int delay = it - frame.ip;
+
+                if(delay < delays[i])
+                    delays[i] = delay;
+            }
+        }
+    }
+
+    int max_delay = delays[RA_BEGIN];
+    ic_pid pid = RA_BEGIN;
+
+    for(int i = RA_BEGIN; i < RA_END; ++i)
+    {
+        int delay = delays[i];
+
+        if(delay >= max_delay)
+        {
+            max_delay = delay;
+            pid = i;
+        }
+    }
+    if(max_delay == MAX_DELAY)
+        assert(frame.reg_file[pid].saved); // remove_unused_vids() should be called before this function
+    return pid;
+}
+
+bool is_unused(ic_reg reg)
+{
+    return !reg.vid && !reg.saved;
+}
+
+void spill_reg(ic_frame& frame, ic_pid pid)
+{
+    assert(!is_unused(frame.reg_file[pid])); // no need to spill unused register
+
+    int offset = 0;
+
+    // find unused reg in memory
+    for(ic_reg& reg: frame.memory)
+    {
+        if(is_unused(reg))
+        {
+            offset = frame.fp_offset - (&reg - frame.memory.begin());
+            reg = frame.reg_file[pid];
+            break;
+        }
+    }
+    // no success, allocate new one
+    if(!offset)
+    {
+        print_asm("addi sp, sp, -1");
+        frame.memory.push_back(frame.reg_file[pid]);
+        offset = frame.fp_offset - (frame.memory.size - 1);
+    }
+
+    frame.reg_file[pid].vid = 0;
+    frame.reg_file[pid].saved = false;
+    print_asm("str r%d, %d(fp)", pid, offset);
+}
+
+ic_pid load_into_reg(ic_frame& frame, ic_vid vid)
+{
+    if(!vid)
+        return {};
+
+    // is it already loaded?
+    for(int i = RR_BEGIN; i < RR_END; ++i)
+    {
+        if(frame.reg_file[i].vid == vid)
+            return i;
+    }
+
+    ic_pid pid = 0;
+
+    // find unused reg
+    for(int i = RA_BEGIN; i < RA_END; ++i)
+    {
+        if(is_unused(frame.reg_file[i]))
+        {
+            pid = i;
+            break;
+        }
+    }
+
+    if(!pid)
+    {
+        pid = find_spill_target(frame);
+        spill_reg(frame, pid);
+    }
+
+    frame.reg_file[pid].vid = vid;
+    int offset = 0;
+
+    for(ic_reg& reg: frame.memory)
+    {
+        if(reg.vid == vid)
+        {
+            reg.vid = 0; // free memory location
+            offset = frame.fp_offset - (&reg - frame.memory.begin());
+        }
+    }
+    assert(offset);
+    print_asm("ldr r%d, %d(fp)", pid, offset);
+    return pid;
+}
+
+ic_pid assign_reg(ic_frame& frame, ic_vid vid)
+{
+    if(!vid)
+        return {};
+
+    // if vid is already assigned, exit; iteration is done over the read range because function parameters are assigned there
+    for(int i = RR_BEGIN; i < RR_END; ++i)
+    {
+        if(frame.reg_file[i].vid == vid)
+            return i;
+    }
+
+    // invalidate corresponding memory location if exists
+    for(ic_reg& reg: frame.memory)
+    {
+        if(reg.vid == vid)
+            reg.vid = 0;
+    }
+
+    // find empty reg, so no spilling is necesary
+    for(int i = RA_BEGIN; i < RA_END; ++i)
+    {
+        if(is_unused(frame.reg_file[i]))
+        {
+            frame.reg_file[i].vid = vid;
+            return i;
+        }
+    }
+    ic_pid pid = find_spill_target(frame);
+    spill_reg(frame, pid);
+    frame.reg_file[pid].vid = vid;
+    return pid;
+}
+
+void gen_function(ic_function& fun, array<ic_ir_instr> code)
+{
+    printf("__%.*s:\n", fun.id_token.str.len, fun.id_token.str.data);
+    print_asm("addi sp, sp, -1");
+    print_asm("str fp, 0(sp)");
+    print_asm("add fp, sp, r0");
+
+    ic_frame frame;
+    frame.memory.init();
+    frame.fp_offset = 0;
+    frame.iend = code.end();
+
+    for(int i = RR_BEGIN; i < RR_END; ++i)
+    {
+        ic_reg& reg = frame.reg_file[i];
+        reg.pid = i;
+        reg.saved = i >= 5;
+        reg.vid = 0;
+    }
+
+    // initialize function parameters (first 4 in [r1-r4] registers, rest on a stack)
+    for(int i = 0; i < fun.params_size; ++i)
+    {
+        int arg_vid = i + 1; // first allocated vid is 1
+        ic_pid pid = i + 1; // skip r0
+
+        if(pid < 5)
+            frame.reg_file[pid].vid = arg_vid;
+        else
+        {
+            ++frame.fp_offset;
+            ic_reg reg;
+            reg.vid = arg_vid;
+            reg.saved = false;
+            frame.memory.push_back(reg);
+        }
+    }
+
+    frame.memory.push_back({0, true, 0}); // add dummy entry for fp - easier memory offset calculation
+
+    if(!fun.leaf)
+    {
+        print_asm("addi sp, sp, -1");
+        print_asm("str lr, -1(fp)");
+        frame.memory.push_back({0, true, 0}); // same for lr
+    }
+
+    for(ic_ir_instr& instr: code)
+    {
+        frame.ip = &instr;
+        remove_unused_vids(frame, frame.memory.begin(), frame.memory.size);
+        remove_unused_vids(frame, frame.reg_file + RR_BEGIN, RR_END - RR_BEGIN); // read range, so we can remove unused paramter vids,
+        // so a next function call doesn't need to spill them
+
+        // first load src registers, assigning dst can discard previous data if it was in memory
+        // functions ignore 0 vids, so it is safe to run load and assign for all instructions, because they are zero initialized
+
+        ic_pid src1 = load_into_reg(frame, instr.src1);
+        ic_pid src2 = load_into_reg(frame, instr.src2);
+        ic_pid dst = assign_reg(frame, instr.dst);
 
         switch(instr.type)
         {
-        case I_ASSIGN:
-            printf("    add r%d, r%d, r0\n", dst, src1);
+        case IR_ASSIGN:
+            print_asm("add r%d, r%d, r0", dst, src1);
             break;
-        case I_ADD:
-            printf("    add r%d, r%d, r%d\n", dst, src1, src2);
+        case IR_ADD:
+            print_asm("add r%d, r%d, r%d", dst, src1, src2);
             break;
-        case I_SUB:
-            printf("    sub r%d, r%d, r%d\n", dst, src1, src2);
+        case IR_SUB:
+            print_asm("sub r%d, r%d, r%d", dst, src1, src2);
             break;
-        case I_MUL:
-            printf("    mul r%d, r%d, r%d\n", dst, src1, src2);
+        case IR_MUL:
+            print_asm("mul r%d, r%d, r%d", dst, src1, src2);
             break;
-        case I_DIV:
-            printf("    div r%d, r%d, r%d\n", dst, src1, src2);
+        case IR_DIV:
+            print_asm("div r%d, r%d, r%d", dst, src1, src2);
             break;
-        case I_INT_LITERAL:
-            printf("    addi r%d, r0, %d\n", dst, instr.int_literal);
+        case IR_INT_LITERAL:
+            print_asm("addi r%d, r0, %d", dst, instr.imm);
             break;
+        case IR_CALL:
+            print_asm("bl __%.*s", instr.fun_name.len, instr.fun_name.data);
+            frame.reg_file[1].vid = instr.call_ret_vid;
+            break;
+        case IR_RETURN:
+            print_asm("add r1, r0, r%d", src1);
+            print_asm("b __end__%.*s\n", fun.id_token.str.len, fun.id_token.str.data);
+            break;
+        case IR_RETURN_VOID:
+            print_asm("b __end__%.*s\n", fun.id_token.str.len, fun.id_token.str.data);
+            break;
+        case IR_ARG:
+        {
+            ic_pid pid = instr.arg_id + 1;
+
+            // first four arguments are passed in the registers, rest on the stack
+            if(instr.arg_id < 4)
+            {
+
+                if(!is_unused(frame.reg_file[pid]))
+                    spill_reg(frame, pid);
+                print_asm("add r%d, r0, r%d", pid, src1);
+            }
+            else
+            {
+                int idx = frame.memory.size;
+
+                for(int i = idx - 1; i >= 0; --i)
+                {
+                    if(!is_unused(frame.memory[i]))
+                        break;
+                    idx = i;
+                }
+
+                if(idx == frame.memory.size)
+                {
+                    frame.memory.push_back();
+                    print_asm("addi sp, sp, -1");
+                }
+
+                int offset = frame.fp_offset - idx;
+                print_asm("ldr r%d, %d(fp)", pid, offset);
+            }
+            break;
+        }
         default:
             assert(false);
         }
     }
-    printf("    str r%d, 0(r0)\n", last_dst);
-    printf("end_loop:\n");
-    printf("    b end_loop\n");
+
+    printf("__end__%.*s:\n", fun.id_token.str.len, fun.id_token.str.data);
+
+    // hack, so fp and lr won't be restored twice; fp must be restored at the last one
+    frame.memory[frame.fp_offset].saved = false;
+
+    if(!fun.leaf)
+    {
+        frame.memory[frame.fp_offset + 1].saved = false;
+        print_asm("ldr lr, -1(fp)");
+    }
+
+    // restore callee saved registers
+    for(ic_reg& reg: frame.memory)
+    {
+        int offset = frame.fp_offset + -(&reg - frame.memory.begin());
+
+        if(reg.saved)
+            print_asm("ldr r%d, %d(fp)", reg.pid, offset);
+    }
+    print_asm("addi sp, fp, 1");
+    print_asm("ldr fp, 0(fp)"); // only now restore fp
+    print_asm("bx lr");
 }
 
-void gen_mycore(array<ic_function> functions, array<ic_struct> structures)
+void gen_mycore(array<ic_function> functions, array<ic_struct>)
 {
-    (void)structures;
-    ctx.vars.init();
-    ctx.instructions.init();
+    print_asm("addi sp, r0, 255");
+    print_asm("addi fp, r0, 255");
+    print_asm("bl __main");
+    print_asm("str r1, 0(r0)");
+    printf("__end:\n");
+    print_asm("b __end");
+
     ctx.scopes.init();
-    ctx.regs_size = 0;
-    build_stmt(functions[0].body);
-    generate_asm(ctx.instructions);
-    return;
+    ctx.vars.init();
+    ctx.code.init();
+
+    for(ic_function& fun: functions)
+    {
+        assert(!ctx.scopes.size);
+        assert(!ctx.vars.size);
+        ctx.code.size = 0;
+        ctx.next_vid = 1;
+        ctx.push_scope();
+
+        for(int i = 0; i < fun.params_size; ++i)
+            ctx.add_var(ctx.alloc_vid());
+
+        build_stmt(fun.body);
+        ctx.pop_scope();
+        gen_function(fun, ctx.code);
+    }
 }
