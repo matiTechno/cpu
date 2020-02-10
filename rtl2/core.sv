@@ -9,6 +9,8 @@
 `define ALU_SRA 8
 `define ALU_MUL 9
 `define ALU_DIV 10
+`define ALU_SLT 11
+`define ALU_SLTU 12
 
 module core(
     input clk,
@@ -30,7 +32,7 @@ module core(
     //control unit
     wire [5:0] alu_opcode;
     wire [1:0] sel_reg_din;
-    wire sel_reg_write, sel_alu_rhs, sel_branch_addr, we_reg, we_ram, sign_extend_imm, beq, bne, blt, bltu, bgt, bgtu;
+    wire sel_reg_write, sel_alu_rhs, sel_branch_addr, we_reg, we_ram, sign_extend_imm, beq, bne;
     wire update_pc, reset_alu;
 
     // register file
@@ -38,13 +40,10 @@ module core(
 
     // alu
     wire [31:0] alu_dout;
-    wire borrow;
+	wire borrow;
 
     // ram
     wire [31:0] ram_dout;
-
-    // branch unit
-    wire branch_en;
 
 
 
@@ -57,6 +56,7 @@ module core(
     wire [31:0] imm32 = sign_extend_imm ? { {16{imm16[15]}}, imm16} : { {16{1'b0}}, imm16};
     wire [31:0] alu_din_rhs = sel_alu_rhs ? imm32 : reg_dout2;
     wire [31:0] branch_addr = sel_branch_addr ? reg_dout1 : imm32;
+	wire branch_en = (beq & ~|alu_dout & ~borrow) | (bne & (|alu_dout | borrow));
 
 
 
@@ -92,42 +92,13 @@ module core(
     instr_decoder instr_decoder(instr, opcode, rtype_opcode, reg1, reg2, reg3, imm16);
 
     control_unit control_unit(clk, reset, opcode, rtype_opcode, alu_opcode, sel_reg_din, sel_reg_write, sel_alu_rhs,
-        sel_branch_addr, we_reg, we_ram, sign_extend_imm, beq, bne, blt, bltu, bgt, bgtu, update_pc, reset_alu);
+        sel_branch_addr, we_reg, we_ram, sign_extend_imm, beq, bne, update_pc, reset_alu);
 
     register_file register_file(clk, reg_din, we_reg, reg_write, reg1, reg2, reg_dout1, reg_dout2);
 
     alu alu(clk, reset_alu, alu_opcode, reg_dout1, alu_din_rhs, alu_dout, borrow);
 
     ram ram(clk, alu_dout, reg_dout2, we_ram, ram_dout);
-
-    branch_unit branch_unit(~|alu_dout, borrow, reg_dout1[31], alu_din_rhs[31], beq, bne, blt, bltu, bgt, bgtu, branch_en);
-
-endmodule
-
-module branch_unit(
-    input zero,
-    input borrow,
-    input sign_lhs,
-    input sign_rhs,
-    input beq,
-    input bne,
-    input blt,
-    input bltu,
-    input bgt,
-    input bgtu,
-    output branch_en
-    );
-
-    wire beq_cond, bne_cond, blt_cond, bltu_cond, bgt_cond, bgtu_cond;
-
-    assign branch_en = (beq & beq_cond)  | (bne & bne_cond) | (blt & blt_cond) | (bltu & bltu_cond) | (bgt & bgt_cond) | (bgtu & bgtu_cond);
-
-    assign beq_cond = zero & ~borrow;
-    assign bne_cond = ~zero | borrow;
-    assign blt_cond = (sign_lhs & ~sign_rhs) | borrow;
-    assign bltu_cond = borrow;
-    assign bgt_cond = ~beq_cond & ~blt_cond;
-    assign bgtu_cond = ~beq_cond & ~bltu_cond;
 
 endmodule
 
@@ -165,10 +136,6 @@ module control_unit(
     output reg sign_extend_imm,
     output reg beq,
     output reg bne,
-    output reg blt,
-    output reg bltu,
-    output reg bgt,
-    output reg bgtu,
     output reg update_pc,
     output reg reset_alu
     );
@@ -196,10 +163,6 @@ module control_unit(
         sign_extend_imm = 0;
         beq = 0;
         bne = 0;
-        blt = 0;
-        bltu = 0;
-        bgt = 0;
-        bgtu = 0;
         update_pc = 1;
         reset_alu = 0;
 
@@ -228,96 +191,60 @@ module control_unit(
                 alu_opcode = `ALU_SUB;
                 bne = 1;
             end
-            3: begin // blt
-                alu_opcode = `ALU_SUB;
-                blt = 1;
-            end
-            4: begin // bltu
-                alu_opcode = `ALU_SUB;
-                bltu = 1;
-            end
-            5: begin // ble
-                alu_opcode = `ALU_SUB;
-                beq = 1;
-                blt = 1;
-            end
-            6: begin // bleu
-                alu_opcode = `ALU_SUB;
-                beq = 1;
-                bltu = 1;
-            end
-            7: begin // bgt
-                alu_opcode = `ALU_SUB;
-                bgt = 1;
-            end
-            8: begin // bgtu
-                alu_opcode = `ALU_SUB;
-                bgtu = 1;
-            end
-            9: begin // bge
-                alu_opcode = `ALU_SUB;
-                beq = 1;
-                bgt = 1;
-            end
-            10: begin // bgeu
-                alu_opcode = `ALU_SUB;
-                beq = 1;
-                bgtu = 1;
-            end
-            11: begin // b
+            3: begin // b
                 beq = 1;
                 bne = 1;
             end
-            12: begin // ldr
+            4: begin // ldr
                 alu_opcode = `ALU_ADD;
                 sel_reg_din = 1;
                 sel_alu_rhs = 1;
                 we_reg = 1;
                 sign_extend_imm = 1;
             end
-            13: begin // str
+            5: begin // str
                 alu_opcode = `ALU_ADD;
                 sel_alu_rhs = 1;
                 we_ram = 1;
                 sign_extend_imm = 1;
             end
-            14: begin // addi
+            6: begin // addi
                 alu_opcode = `ALU_ADD;
                 sel_alu_rhs = 1;
                 we_reg = 1;
                 sign_extend_imm = 1;
             end
-            15: begin // andi
+            7: begin // andi
                 alu_opcode = `ALU_AND;
                 sel_alu_rhs = 1;
                 we_reg = 1;
             end
-            16: begin // ori
+            8: begin // ori
                 alu_opcode = `ALU_OR;
                 sel_alu_rhs = 1;
                 we_reg = 1;
             end
-            17: begin // xori
+            9: begin // xori
                 alu_opcode = `ALU_XOR;
                 sel_alu_rhs = 1;
                 we_reg = 1;
             end
-            18: begin // slli
+            10: begin // slli
                 alu_opcode = `ALU_SLL;
                 sel_alu_rhs = 1;
                 we_reg = 1;
             end
-            19: begin // srli
+            11: begin // srli
                 alu_opcode = `ALU_SRL;
                 sel_alu_rhs = 1;
                 we_reg = 1;
             end
-            20: begin // srai
+            12: begin // srai
                 alu_opcode = `ALU_SRA;
                 sel_alu_rhs = 1;
                 we_reg = 1;
             end
-            21: begin // muli
+            13: begin // muli
                 alu_opcode = `ALU_MUL;
                 sel_alu_rhs = 1;
                 sign_extend_imm = 1;
@@ -329,7 +256,7 @@ module control_unit(
                     reset_alu = ~|counter;
                 end
             end
-            22: begin // divi
+            14: begin // divi
                 alu_opcode = `ALU_DIV;
                 sel_alu_rhs = 1;
                 sign_extend_imm = 1;
@@ -341,13 +268,24 @@ module control_unit(
                     reset_alu = ~|counter;
                 end
             end
-            23: begin // bl
+           15: begin // slti
+                alu_opcode = `ALU_SLT;
+                sel_alu_rhs = 1;
+                we_reg = 1;
+                sign_extend_imm = 1;
+			end
+            16: begin // sltiu
+                alu_opcode = `ALU_SLTU;
+                sel_alu_rhs = 1;
+                we_reg = 1;
+			end
+            17: begin // bl
                 sel_reg_din = 2;
                 we_reg = 1;
                 beq = 1;
                 bne = 1;
             end
-            24: begin // bx
+            18: begin // bx
                 sel_branch_addr = 1;
                 beq = 1;
                 bne = 1;
@@ -388,7 +326,7 @@ module alu(
     input [31:0] din_lhs,
     input [31:0] din_rhs,
     output reg [31:0] dout,
-    output borrow
+	output reg borrow
     );
 
     wire [31:0] sum, diff, product, quotient;
@@ -401,19 +339,21 @@ module alu(
 
     always_comb begin
         case(opcode)
-            `ALU_ADD: dout = sum;
-            `ALU_SUB: dout = diff;
-            `ALU_AND: dout = din_lhs & din_rhs;
-            `ALU_OR:  dout = din_lhs | din_rhs;
-            `ALU_XOR: dout = din_lhs ^ din_rhs;
-            `ALU_NOR: dout = ~(din_lhs | din_rhs);
+            `ALU_ADD:  dout = sum;
+            `ALU_SUB:  dout = diff;
+            `ALU_AND:  dout = din_lhs & din_rhs;
+            `ALU_OR:   dout = din_lhs | din_rhs;
+            `ALU_XOR:  dout = din_lhs ^ din_rhs;
+            `ALU_NOR:  dout = ~(din_lhs | din_rhs);
             // todo, use own shifter modules
-            `ALU_SLL: dout = din_lhs << shift_count;
-            `ALU_SRL: dout = din_lhs >> shift_count;
-            `ALU_SRA: dout = din_lhs >>> shift_count;
-            `ALU_MUL: dout = product;
-            `ALU_DIV: dout = quotient;
-            default:  dout = 0;
+            `ALU_SLL:  dout = din_lhs << shift_count;
+            `ALU_SRL:  dout = din_lhs >> shift_count;
+            `ALU_SRA:  dout = din_lhs >>> shift_count;
+            `ALU_MUL:  dout = product;
+            `ALU_DIV:  dout = quotient;
+            `ALU_SLT:  dout = {{31{1'b0}}, (din_lhs[31] & ~din_rhs[31]) | borrow};
+            `ALU_SLTU: dout = {{31{1'b0}}, borrow};
+            default:   dout = 0;
         endcase
     end
 

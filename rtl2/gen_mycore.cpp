@@ -16,6 +16,9 @@ enum ic_ir_instr_type
     IR_RETURN,
     IR_RETURN_VOID,
     IR_ARG,
+    IR_LABEL,
+    IR_BEQ,
+    IR_BNE,
 };
 
 // three-address code
@@ -26,10 +29,11 @@ struct ic_ir_instr
     ic_vid dst;
     ic_vid src1;
     ic_vid src2;
-    int imm;
+    int int_literal;
     int arg_id;
     ic_str fun_name;
     ic_vid call_ret_vid;
+    int label_id;
 };
 
 struct ic_scope
@@ -43,6 +47,7 @@ struct
     array<ic_vid> vars;
     array<ic_ir_instr> code;
     int next_vid;
+    int next_label_id;
 
     void push_scope()
     {
@@ -60,6 +65,14 @@ struct
     {
         assert(scopes.size);
         vars.push_back(vid);
+    }
+
+    void build_label(int label_id)
+    {
+        ic_ir_instr instr = {};
+        instr.type = IR_LABEL;
+        instr.label_id = label_id;
+        code.push_back(instr);
     }
 
     // for return void set vid to 0
@@ -125,7 +138,7 @@ struct
         ic_ir_instr instr = {};
         instr.type = IR_INT_LITERAL;
         instr.dst = alloc_vid();
-        instr.imm = val;
+        instr.int_literal = val;
         code.push_back(instr);
         return instr.dst;
     }
@@ -146,6 +159,13 @@ struct
         ic_vid vid = next_vid;
         ++next_vid;
         return vid;
+    }
+
+    int alloc_label()
+    {
+        int label = next_label_id;
+        ++next_label_id;
+        return label;
     }
 } ctx;
 
@@ -203,6 +223,14 @@ ic_vid build_expr(ic_expr* expr)
         return ctx.build_int_literal(expr->int_literal);
     case EXPR_VAR_ID:
         return ctx.vars[expr->var_id];
+    case EXPR_CMP_EQ:
+    case EXPR_CMP_NEQ:
+    case EXPR_CMP_GT:
+    case EXPR_CMP_GE:
+    case EXPR_CMP_LT:
+    case EXPR_CMP_LE:
+        assert(false);
+        break;
     default:
         assert(false);
         return {};
@@ -229,6 +257,19 @@ void build_stmt(ic_stmt* stmt)
         }
         if(stmt->compound.push_scope)
             ctx.pop_scope();
+        return;
+    }
+    case STMT_IF:
+    {
+        assert(false);
+        int label = ctx.alloc_label();
+        ic_vid cond = build_expr(stmt->_if.header);
+        (void)cond;
+        build_stmt(stmt->_if.body_if);
+        ctx.build_label(label);
+
+        if(stmt->_if.body_else)
+            build_stmt(stmt->_if.body_else);
         return;
     }
     case STMT_EXPR:
@@ -581,7 +622,7 @@ void gen_function(ic_function& fun, array<ic_ir_instr> code)
             print_asm("div r%d, r%d, r%d", dst, src1, src2);
             break;
         case IR_INT_LITERAL:
-            print_asm("addi r%d, r0, %d", dst, instr.imm);
+            print_asm("addi r%d, r0, %d", dst, instr.int_literal);
             break;
         case IR_CALL:
             print_asm("bl __%.*s", instr.fun_name.len, instr.fun_name.data);
@@ -675,6 +716,7 @@ void gen_mycore(array<ic_function> functions, array<ic_struct>)
     ctx.scopes.init();
     ctx.vars.init();
     ctx.code.init();
+    ctx.next_label_id = 0;
 
     for(ic_function& fun: functions)
     {

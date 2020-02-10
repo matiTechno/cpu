@@ -34,6 +34,8 @@ alu_opcode:
 8 - sra
 9 - mul
 10 - div
+11 - slt // set if less than
+12 - sltu
 
 // note: mul and div currently support only signed arithmetic and store the result only in 32 bits;
 // they take 33 cycles to execute, all other instructions take 1 cycle
@@ -43,33 +45,26 @@ i-type instructions (by opcode):
 
 1)  beq reg1, reg2, imm    // imm is an absolute address of the program memory
 2)  bne ...
-3)  blt     // less than
-4)  bltu    // less than unsigned
-5)  ble     // less equal
-6)  bleu
-7)  bgt     // greater
-8)  bgtu
-9)  bge     // greater equal
-10) bgeu
 
-11) b imm   // unconditional branch
+3) b imm   // unconditional branch
 
-12) ldr reg2, imm(reg1)    // reg2 = *(reg1 + imm); if reg2 is r0, then imm is an absolute address
-13) str reg2, imm(reg1)    // *(reg1 + imm) = reg2
+4) ldr reg2, imm(reg1)    // reg2 = *(reg1 + imm); if reg2 is r0, then imm is an absolute address
+5) str reg2, imm(reg1)    // *(reg1 + imm) = reg2
 
-14) addi reg2, reg1, imm   // reg2 = reg1 + imm
-15) andi ...
-16) ori
-17) xori
-18) slli                   // shift left logical
-19) srli                   // shift right logical
-20) srai                   // shift right arithmetic
-21) muli
-22) divi
+6) addi reg2, reg1, imm   // reg2 = reg1 + imm
+7) andi ...
+8) ori
+9) xori
+10) slli                   // shift left logical
+11) srli                   // shift right logical
+12) srai                   // shift right arithmetic
+13) muli
+14) divi
+15) slti
+16) sltiu
 
-
-23) bl imm  // branch and link; reg2 must be set to lr
-24) bx reg1 // branch exchange, sets pc to reg1
+17) bl imm  // branch and link; reg2 must be set to lr
+18) bx reg1 // branch exchange, sets pc to reg1
 
 r-type instructions (opcode == 0):
 
@@ -82,8 +77,13 @@ nor                    // if reg2 is r0, reg3 = ~reg1
 sll
 srl
 sra
-
+mul
+div
+slt                    // reg3 = reg1 < reg2
+sltu
 
 immediate operands for logical instructions are zero extended, for arithmetic
 they are sign extended (addi, muli, divi)
 sign extension also happens for ldr and str instructions
+slti - sign extended
+sltiu - zero extended

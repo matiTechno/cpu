@@ -3,7 +3,10 @@
     addi r3, r0, 1 // result
 
 main_loop:
-    bgt r2, r1, end_main_loop
+	// bgt r2, r1, end_main_loop
+	slt r9, r1, r2
+	bne r9, r0, end_main_loop
+
     add r4, r0, r3 // multiplicand
     addi r5, r0, 1 // mul iterator
 

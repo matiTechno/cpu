@@ -11,7 +11,7 @@
 #define ASM_FP 29
 
 #define ASM_S16 0
-#define ASM_U16 0
+#define ASM_U16 1
 
 enum asm_token_type
 {
@@ -37,17 +37,11 @@ enum asm_token_type
     TOK_SRA,
     TOK_MUL,
     TOK_DIV,
+    TOK_SLT,
+    TOK_SLTU,
 
     TOK_BEQ,
     TOK_BNE,
-    TOK_BLT,
-    TOK_BLTU,
-    TOK_BLE,
-    TOK_BLEU,
-    TOK_BGT,
-    TOK_BGTU,
-    TOK_BGE,
-    TOK_BGEU,
 
     TOK_B,
 
@@ -63,6 +57,8 @@ enum asm_token_type
     TOK_SRAI,
     TOK_MULI,
     TOK_DIVI,
+    TOK_SLTI,
+    TOK_SLTIU,
 
     TOK_BL,
     TOK_BX,
@@ -90,16 +86,10 @@ static asm_keyword _keywords[] = {
     "sra",  TOK_SRA,
     "mul",  TOK_MUL,
     "div",  TOK_DIV,
+    "slt",  TOK_SLT,
+    "sltu", TOK_SLTU,
     "beq",  TOK_BEQ,
     "bne",  TOK_BNE,
-    "blt",  TOK_BLT,
-    "bltu", TOK_BLTU,
-    "ble",  TOK_BLE,
-    "bleu", TOK_BLEU,
-    "bgt",  TOK_BGT,
-    "bgtu", TOK_BGTU,
-    "bge",  TOK_BGE,
-    "bgeu", TOK_BGEU,
     "b",    TOK_B,
     "ldr",  TOK_LDR,
     "str",  TOK_STR,
@@ -112,6 +102,8 @@ static asm_keyword _keywords[] = {
     "srai", TOK_SRAI,
     "muli", TOK_MULI,
     "divi", TOK_DIVI,
+    "slti", TOK_SLTI,
+    "sltiu",TOK_SLTIU,
     "bl",   TOK_BL,
     "bx",   TOK_BX,
     "lr",   TOK_LR,
@@ -526,7 +518,7 @@ array<unsigned int> generate_code(asm_token* token, array<asm_label> labels)
             consume_comma(token);
             instr.reg2 = consume_reg(token);
         }
-        else if(type >= TOK_BEQ && type < TOK_B)
+        else if(type == TOK_BEQ || type == TOK_BNE)
         {
             instr.opcode = 1 + (type - TOK_BEQ);
             ++token;
@@ -538,13 +530,13 @@ array<unsigned int> generate_code(asm_token* token, array<asm_label> labels)
         }
         else if(type == TOK_B)
         {
-            instr.opcode = 11;
+            instr.opcode = 3;
             ++token;
             instr.immediate = consume_label_identifier(token, labels);
         }
         else if(type == TOK_LDR || type == TOK_STR)
         {
-            instr.opcode = 12 + (type - TOK_LDR);
+            instr.opcode = 4 + (type - TOK_LDR);
             ++token;
             instr.reg2 = consume_reg(token);
             consume_comma(token);
@@ -555,28 +547,28 @@ array<unsigned int> generate_code(asm_token* token, array<asm_label> labels)
         }
         else if(type >= TOK_ADDI && type < TOK_BL)
         {
-            instr.opcode = 14 + (type - TOK_ADDI);
+            instr.opcode = 6 + (type - TOK_ADDI);
             ++token;
             instr.reg2 = consume_reg(token);
             consume_comma(token);
             instr.reg1 = consume_reg(token);
             consume_comma(token);
 
-            if(type == TOK_ADDI || type == TOK_MULI || type == TOK_DIVI)
+            if(type == TOK_ADDI || type == TOK_MULI || type == TOK_DIVI || type == TOK_SLTI)
                 instr.immediate = consume_int_literal(token, ASM_S16);
             else
                 instr.immediate = consume_int_literal(token, ASM_U16);
         }
         else if(type == TOK_BL)
         {
-            instr.opcode = 23;
+            instr.opcode = 17;
             ++token;
             instr.immediate = consume_label_identifier(token, labels);
             instr.reg2 = ASM_LR;
         }
         else if(type == TOK_BX)
         {
-            instr.opcode = 24;
+            instr.opcode = 18;
             ++token;
             instr.reg1 = consume_reg(token);
         }
