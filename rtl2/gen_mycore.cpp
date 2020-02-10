@@ -17,8 +17,10 @@ enum ic_ir_instr_type
     IR_RETURN_VOID,
     IR_ARG,
     IR_LABEL,
-    IR_BEQ,
-    IR_BNE,
+    IR_BR_FALSE,
+    IR_BR_TRUE,
+    IR_CMP_EQ,
+    IR_CMP_NEQ,
 };
 
 // three-address code
@@ -65,6 +67,24 @@ struct
     {
         assert(scopes.size);
         vars.push_back(vid);
+    }
+
+    void build_br_true(int label_id, ic_vid vid)
+    {
+        ic_ir_instr instr = {};
+        instr.type = IR_BR_TRUE;
+        instr.src1 = vid;
+        instr.label_id = label_id;
+        code.push_back(instr);
+    }
+
+    void build_br_false(int label_id, ic_vid vid)
+    {
+        ic_ir_instr instr = {};
+        instr.type = IR_BR_FALSE;
+        instr.src1 = vid;
+        instr.label_id = label_id;
+        code.push_back(instr);
     }
 
     void build_label(int label_id)
@@ -131,6 +151,16 @@ struct
     ic_vid build_div(ic_vid a, ic_vid b)
     {
         return build_binary(IR_DIV, a, b);
+    }
+
+    ic_vid build_cmp_eq(ic_vid a, ic_vid b)
+    {
+        return build_binary(IR_CMP_EQ, a, b);
+    }
+
+    ic_vid build_cmp_neq(ic_vid a, ic_vid b)
+    {
+        return build_binary(IR_CMP_NEQ, a, b);
     }
 
     ic_vid build_int_literal(int val)
@@ -224,7 +254,17 @@ ic_vid build_expr(ic_expr* expr)
     case EXPR_VAR_ID:
         return ctx.vars[expr->var_id];
     case EXPR_CMP_EQ:
+    {
+        ic_vid lhs = build_expr(expr->binary.lhs);
+        ic_vid rhs = build_expr(expr->binary.rhs);
+        return ctx.build_cmp_eq(lhs, rhs);
+    }
     case EXPR_CMP_NEQ:
+    {
+        ic_vid lhs = build_expr(expr->binary.lhs);
+        ic_vid rhs = build_expr(expr->binary.rhs);
+        return ctx.build_cmp_neq(lhs, rhs);
+    }
     case EXPR_CMP_GT:
     case EXPR_CMP_GE:
     case EXPR_CMP_LT:
@@ -261,10 +301,9 @@ void build_stmt(ic_stmt* stmt)
     }
     case STMT_IF:
     {
-        assert(false);
         int label = ctx.alloc_label();
         ic_vid cond = build_expr(stmt->_if.header);
-        (void)cond;
+        ctx.build_br_false(label, cond);
         build_stmt(stmt->_if.body_if);
         ctx.build_label(label);
 
@@ -675,6 +714,23 @@ void gen_function(ic_function& fun, array<ic_ir_instr> code)
             }
             break;
         }
+        case IR_LABEL:
+            printf("L%d:\n", instr.label_id);
+            break;
+        case IR_BR_FALSE:
+            print_asm("beq r%d, r0, L%d", src1, instr.label_id);
+            break;
+        case IR_BR_TRUE:
+            assert(false);
+            break;
+        case IR_CMP_EQ:
+            print_asm("xor r%d, r%d, r%d", dst, src1, src2);
+            print_asm("sltiu r%d, r%d, 1", dst, dst);
+            break;
+        case IR_CMP_NEQ:
+            print_asm("xor r%d, r%d, r%d", dst, src1, src2);
+            print_asm("sltu r%d, r0, r%d", dst, dst);
+            break;
         default:
             assert(false);
         }
