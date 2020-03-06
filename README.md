@@ -1,3 +1,12 @@
+update:  
+most advanced core is rtl2/core.sv, it is implemented in system verilog; it has mips-like ISA and is single cycle (no pipeline); see rtl2/architecture.txt for instruction encoding and more details;  
+project is tested using verilator simulation and assembler
+```
+cd rtl2
+./run.sh test/factorial.asm
+```
+
+--------
 cpu and cpu1 are doing the same thing, cpu1 is more clean visually  
 this cpu is the 'hack' machine from nand to tetris course
 and you can build it in this game http://nandgame.com/  
